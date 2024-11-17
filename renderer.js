@@ -13,6 +13,7 @@ let videoStartSettings = {
         active: false
     }
 };
+let includeSubfolders = false;
 
 const mediaElement = document.getElementById('current-media');
 const videoElement = document.getElementById('current-video');
@@ -89,15 +90,22 @@ function stopCurrentMedia() {
     }
 }
 
+async function scanDirectory(dirPath, includeSubfolders) {
+    let files = await window.electronAPI.getDirectoryContents(dirPath, includeSubfolders);
+    return files;
+}
+
 async function loadDirectory() {
     stopCurrentMedia();
-    const result = await window.electronAPI.selectDirectory();
-    if (result && result.length > 0) {
-        window.fullDirectoryListing = result;
-        // Extract directory path from the first file
-        currentDirectory = result[0].substring(0, result[0].lastIndexOf(result[0].includes('\\') ? '\\' : '/'));
+    const dirPath = await window.electronAPI.selectDirectory();
+    if (dirPath) {
+        currentDirectory = dirPath;
         currentDirPath.textContent = currentDirectory;
         openDirBtn.style.display = 'block';
+        
+        // Scan directory with current subfolder preference
+        window.fullDirectoryListing = await scanDirectory(currentDirectory, includeSubfolders);
+        
         currentIndex = 0;
         deletedImages = [];
         filterFiles();
@@ -106,6 +114,7 @@ async function loadDirectory() {
 
 async function updateMedia() {
     if (images.length === 0) {
+        stopCurrentMedia();
         mediaElement.style.display = 'none';
         videoElement.style.display = 'none';
         counterElement.textContent = 'No media';
@@ -114,39 +123,48 @@ async function updateMedia() {
     }
     
     const currentFile = images[currentIndex];
-    const fileName = currentFile.split('\\').pop().split('/').pop();
     
-    // Get file metadata
-    const metadata = await window.electronAPI.getFileMetadata(currentFile);
+    // Stop current media before loading new one
+    stopCurrentMedia();
     
-    // Format file size
-    const fileSize = formatFileSize(metadata.size);
-    
-    // Format resolution
-    const resolution = metadata.width && metadata.height ? 
-        `${metadata.width}x${metadata.height}` : 'Unknown';
-    
-    // Format duration for videos
-    const duration = metadata.isVideo && metadata.duration ? 
-        formatDuration(metadata.duration) : '';
-    
-    // Create info string
-    const infoString = `${fileName} (${resolution}, ${fileSize}${duration ? `, ${duration}` : ''})`;
-    fileNameElement.textContent = infoString;
-    
-    if (isVideo(currentFile)) {
-        mediaElement.style.display = 'none';
-        videoElement.style.display = 'block';
-        videoElement.src = `file://${currentFile}`;
-        videoElement.controls = !isFullscreen;
-        handleVideoStart();
-    } else {
-        mediaElement.style.display = 'block';
-        videoElement.style.display = 'none';
-        mediaElement.src = `file://${currentFile}`;
+    try {
+        const fileName = currentFile.split('\\').pop().split('/').pop();
+        
+        // Get file metadata
+        const metadata = await window.electronAPI.getFileMetadata(currentFile);
+        
+        // Format file size
+        const fileSize = formatFileSize(metadata.size);
+        
+        // Format resolution
+        const resolution = metadata.width && metadata.height ? 
+            `${metadata.width}x${metadata.height}` : 'Unknown';
+        
+        // Format duration for videos
+        const duration = metadata.isVideo && metadata.duration ? 
+            formatDuration(metadata.duration) : '';
+        
+        // Create info string
+        const infoString = `${fileName} (${resolution}, ${fileSize}${duration ? `, ${duration}` : ''})`;
+        fileNameElement.textContent = infoString;
+        
+        if (isVideo(currentFile)) {
+            mediaElement.style.display = 'none';
+            videoElement.style.display = 'block';
+            videoElement.src = `file://${currentFile}`;
+            videoElement.controls = !isFullscreen;
+            handleVideoStart();
+        } else {
+            mediaElement.style.display = 'block';
+            videoElement.style.display = 'none';
+            mediaElement.src = `file://${currentFile}`;
+        }
+        
+        counterElement.textContent = `File ${currentIndex + 1} of ${images.length}`;
+    } catch (error) {
+        console.error('Error updating media:', error);
+        fileNameElement.textContent = 'Error loading file';
     }
-    
-    counterElement.textContent = `File ${currentIndex + 1} of ${images.length}`;
 }
 
 function formatFileSize(bytes) {
@@ -171,45 +189,74 @@ function formatDuration(seconds) {
 async function deleteCurrentImage() {
     if (images.length === 0) return;
     
-    const success = await window.electronAPI.deleteImage(images[currentIndex]);
-    if (success) {
-        deletedImages.push({
-            path: images[currentIndex],
-            index: currentIndex
-        });
-        
-        images.splice(currentIndex, 1);
-        if (currentIndex >= images.length) {
-            currentIndex = Math.max(0, images.length - 1);
+    const currentFile = images[currentIndex];
+    
+    // Stop media playback before deletion
+    stopCurrentMedia();
+    
+    // Small delay to ensure resources are freed
+    await new Promise(resolve => setTimeout(resolve, 100));
+    
+    try {
+        const result = await window.electronAPI.deleteImage(currentFile);
+        if (result.success) {
+            deletedImages.push({ originalPath: currentFile, tempPath: result.tempPath });
+            images.splice(currentIndex, 1);
+            if (currentIndex >= images.length) {
+                currentIndex = Math.max(0, images.length - 1);
+            }
+            updateMedia();
+        } else {
+            console.error('Failed to delete file:', result.error);
         }
-        updateMedia();
+    } catch (error) {
+        console.error('Error in deleteCurrentImage:', error);
     }
 }
 
 async function undoDelete() {
     if (deletedImages.length === 0) return;
     
-    const lastDeleted = deletedImages.pop();
-    const success = await window.electronAPI.undeleteImage(lastDeleted.path);
+    // Stop current media before file operations
+    stopCurrentMedia();
     
-    if (success) {
-        images.splice(lastDeleted.index, 0, lastDeleted.path);
-        currentIndex = lastDeleted.index;
-        updateMedia();
+    // Small delay to ensure resources are freed
+    await new Promise(resolve => setTimeout(resolve, 100));
+    
+    const lastDeleted = deletedImages.pop();
+    try {
+        const result = await window.electronAPI.undeleteImage(lastDeleted.originalPath);
+        if (result.success) {
+            // Find the correct position to insert the restored file
+            let insertIndex = 0;
+            while (insertIndex < images.length && 
+                   images[insertIndex].localeCompare(lastDeleted.originalPath) < 0) {
+                insertIndex++;
+            }
+            images.splice(insertIndex, 0, lastDeleted.originalPath);
+            currentIndex = insertIndex;
+            updateMedia();
+        } else {
+            console.error('Failed to undelete file:', result.error);
+            deletedImages.push(lastDeleted); // Put it back in the deleted list if failed
+        }
+    } catch (error) {
+        console.error('Error in undoDelete:', error);
+        deletedImages.push(lastDeleted); // Put it back in the deleted list if failed
     }
 }
 
 selectButton.addEventListener('click', loadDirectory);
 
 document.addEventListener('keydown', (event) => {
+    // Always prevent default behavior for arrow keys
+    if (['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown'].includes(event.key)) {
+        event.preventDefault();
+    }
+
     if (event.key === 'Escape' && isFullscreen) {
         toggleFullscreen();
         return;
-    }
-
-    // Prevent default behavior for arrow keys in fullscreen mode
-    if (isFullscreen && ['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown'].includes(event.key)) {
-        event.preventDefault();
     }
 
     switch (event.key) {
@@ -426,3 +473,42 @@ function initializeExtrasSettings() {
 }
 
 initializeExtrasSettings();
+
+document.getElementById('include-subfolders').addEventListener('change', async (e) => {
+    includeSubfolders = e.target.checked;
+    if (currentDirectory) {
+        // Rescan directory with new subfolder preference
+        window.fullDirectoryListing = await scanDirectory(currentDirectory, includeSubfolders);
+        filterFiles();
+    }
+    // Save preference
+    localStorage.setItem('includeSubfolders', includeSubfolders);
+});
+
+// Add this to your initialization code
+function initializeSubfolderSetting() {
+    const subfoldersToggle = document.getElementById('include-subfolders');
+    // Load saved preference
+    includeSubfolders = localStorage.getItem('includeSubfolders') === 'true';
+    subfoldersToggle.checked = includeSubfolders;
+}
+
+// Add this to your other initialization calls
+initializeSubfolderSetting();
+
+function initializeThemeSettings() {
+    const savedTheme = localStorage.getItem('theme') || 'dark';
+    document.documentElement.setAttribute('data-theme', savedTheme);
+    document.querySelector(`input[name="theme"][value="${savedTheme}"]`).checked = true;
+
+    document.querySelectorAll('input[name="theme"]').forEach(radio => {
+        radio.addEventListener('change', (e) => {
+            const newTheme = e.target.value;
+            document.documentElement.setAttribute('data-theme', newTheme);
+            localStorage.setItem('theme', newTheme);
+        });
+    });
+}
+
+// Add this to your initialization calls
+initializeThemeSettings();

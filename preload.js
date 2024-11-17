@@ -6,5 +6,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
     undeleteImage: (filePath) => ipcRenderer.invoke('undelete-image', filePath),
     setFullscreen: (flag) => ipcRenderer.invoke('set-fullscreen', flag),
     openDirectory: (path) => ipcRenderer.invoke('open-directory', path),
-    getFileMetadata: (path) => ipcRenderer.invoke('get-file-metadata', path)
+    getFileMetadata: (path) => ipcRenderer.invoke('get-file-metadata', path),
+    getDirectoryContents: (dirPath, includeSubfolders) => 
+        ipcRenderer.invoke('getDirectoryContents', dirPath, includeSubfolders),
 }); 

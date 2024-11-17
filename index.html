@@ -6,8 +6,8 @@
       body {
         margin: 0;
         padding: 20px;
-        background-color: #1a1a1a;
-        color: #ffffff;
+        background-color: var(--bg-color);
+        color: var(--text-color);
         font-family: Arial, sans-serif;
         display: flex;
         flex-direction: column;
@@ -32,9 +32,9 @@
         width: fit-content;
         min-width: 200px;
         padding: 10px;
-        background: #333;
+        background: var(--secondary-bg);
         border: none;
-        color: white;
+        color: var(--text-color);
         cursor: pointer;
         display: flex;
         align-items: center;
@@ -45,7 +45,7 @@
       }
 
       .toggle-settings-btn:hover {
-        background: #444;
+        background: var(--hover-bg);
       }
 
       .toggle-icon {
@@ -84,7 +84,7 @@
       #select-btn {
         padding: 12px 24px;
         font-size: 16px;
-        background-color: #007bff;
+        background-color: var(--button-bg);
         color: white;
         border: none;
         border-radius: 4px;
@@ -93,7 +93,7 @@
       }
 
       #select-btn:hover {
-        background-color: #0056b3;
+        background-color: var(--button-hover);
       }
 
       #image-container {
@@ -308,7 +308,7 @@
         display: flex;
         align-items: center;
         gap: 10px;
-        background: rgba(0, 0, 0, 0.2);
+        background: var(--secondary-bg);
         padding: 10px;
         border-radius: 4px;
         flex: 1;
@@ -317,7 +317,7 @@
       #select-btn {
         padding: 12px 24px;
         font-size: 16px;
-        background-color: #007bff;
+        background-color: var(--button-bg);
         color: white;
         border: none;
         border-radius: 4px;
@@ -326,7 +326,7 @@
       }
 
       #select-btn:hover {
-        background-color: #0056b3;
+        background-color: var(--button-hover);
       }
 
       #current-dir-path {
@@ -389,6 +389,92 @@
         padding-bottom: 10px;
         border-bottom: 1px solid rgba(255, 255, 255, 0.2);
         margin-bottom: 15px;
+      }
+
+      .theme-settings {
+        margin-left: 20px;
+        padding: 10px;
+        border-left: 1px solid rgba(255, 255, 255, 0.1);
+      }
+
+      .theme-options {
+        display: flex;
+        flex-direction: column;
+        gap: 10px;
+      }
+
+      .theme-options label {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+      }
+
+      .theme-heading {
+        font-size: 1.2em;
+        font-weight: bold;
+        color: #fff;
+        margin: 0;
+        padding-bottom: 10px;
+        border-bottom: 1px solid rgba(255, 255, 255, 0.2);
+        margin-bottom: 15px;
+      }
+
+      /* Theme Variables */
+      :root[data-theme="dark"] {
+        --bg-color: #1a1a1a;
+        --text-color: #ffffff;
+        --secondary-bg: #333;
+        --hover-bg: #444;
+        --border-color: rgba(255, 255, 255, 0.2);
+        --button-bg: #007bff;
+        --button-hover: #0056b3;
+      }
+
+      :root[data-theme="light"] {
+        --bg-color: #f5f5f5;
+        --text-color: #333333;
+        --secondary-bg: #e0e0e0;
+        --hover-bg: #d0d0d0;
+        --border-color: rgba(0, 0, 0, 0.2);
+        --button-bg: #007bff;
+        --button-hover: #0056b3;
+      }
+
+      :root[data-theme="pink"] {
+        --bg-color: #ffd6e6;
+        --text-color: #4a4a4a;
+        --secondary-bg: #ffb6c1;
+        --hover-bg: #ff99b3;
+        --border-color: rgba(255, 182, 193, 0.4);
+        --button-bg: #ff69b4;
+        --button-hover: #ff1493;
+      }
+
+      /* Update existing color properties to use variables */
+      body {
+        background-color: var(--bg-color);
+        color: var(--text-color);
+      }
+
+      .toggle-settings-btn {
+        background: var(--secondary-bg);
+        color: var(--text-color);
+      }
+
+      .toggle-settings-btn:hover {
+        background: var(--hover-bg);
+      }
+
+      .current-dir-container {
+        background: var(--secondary-bg);
+      }
+
+      #select-btn {
+        background-color: var(--button-bg);
+      }
+
+      #select-btn:hover {
+        background-color: var(--button-hover);
       }
     </style>
   </head>
@@ -524,6 +610,29 @@
             <label>
               <input type="checkbox" id="toggle-instructions" checked />
               Show Instructions
+            </label>
+          </div>
+          <div class="setting-row">
+            <label>
+              <input type="checkbox" id="include-subfolders" />
+              Include Subfolders
+            </label>
+          </div>
+        </div>
+        <div class="filter-group theme-settings">
+          <h3 class="theme-heading">Theme</h3>
+          <div class="theme-options">
+            <label>
+              <input type="radio" name="theme" value="dark" checked />
+              Dark Theme
+            </label>
+            <label>
+              <input type="radio" name="theme" value="light" />
+              Light Theme
+            </label>
+            <label>
+              <input type="radio" name="theme" value="pink" />
+              Pink Theme
             </label>
           </div>
         </div>

@@ -1,24 +1,23 @@
 const { app, BrowserWindow, Menu, dialog, ipcMain, shell } = require('electron');
 const path = require('path');
-const fs = require('fs');
+const fs = require('fs').promises;
 const { exec } = require('child_process');
 const ffprobe = require('ffprobe-static');
 const sizeOf = require('image-size');
 
 const deletedFilesDir = path.join(app.getPath('temp'), 'image-viewer-deleted');
 
-function initializeTempDirectory() {
-    if (fs.existsSync(deletedFilesDir)) {
-        fs.rmSync(deletedFilesDir, { recursive: true, force: true });
+async function initializeTempDirectory() {
+    try {
+        await fs.mkdir(deletedFilesDir, { recursive: true });
+    } catch (error) {
+        console.error('Error initializing temp directory:', error);
     }
-    fs.mkdirSync(deletedFilesDir, { recursive: true });
 }
 
-function cleanupTempDirectory() {
+async function cleanupTempDirectory() {
     try {
-        if (fs.existsSync(deletedFilesDir)) {
-            fs.rmSync(deletedFilesDir, { recursive: true, force: true });
-        }
+        await fs.rm(deletedFilesDir, { recursive: true, force: true });
     } catch (error) {
         console.error('Error cleaning up temp directory:', error);
     }
@@ -75,11 +74,9 @@ ipcMain.handle('select-directory', async () => {
         properties: ['openDirectory']
     });
     if (!result.canceled) {
-        const dirPath = result.filePaths[0];
-        return fs.readdirSync(dirPath)
-            .map(file => path.join(dirPath, file));
+        return result.filePaths[0];
     }
-    return [];
+    return null;
 });
 
 ipcMain.handle('delete-image', async (event, filePath) => {
@@ -87,29 +84,32 @@ ipcMain.handle('delete-image', async (event, filePath) => {
         const fileName = path.basename(filePath);
         const tempPath = path.join(deletedFilesDir, fileName);
         
-        await fs.promises.copyFile(filePath, tempPath);
-        await fs.promises.unlink(filePath);
-        return true;
+        await fs.mkdir(deletedFilesDir, { recursive: true });
+        
+        await fs.copyFile(filePath, tempPath);
+        
+        await fs.unlink(filePath);
+        
+        return { success: true, tempPath };
     } catch (error) {
         console.error('Error deleting file:', error);
-        return false;
+        return { success: false, error: error.message };
     }
 });
 
-ipcMain.handle('undelete-image', async (event, filePath) => {
+ipcMain.handle('undelete-image', async (event, originalPath) => {
     try {
-        const fileName = path.basename(filePath);
+        const fileName = path.basename(originalPath);
         const tempPath = path.join(deletedFilesDir, fileName);
         
-        if (fs.existsSync(tempPath)) {
-            await fs.promises.copyFile(tempPath, filePath);
-            await fs.promises.unlink(tempPath);
-            return true;
-        }
-        return false;
+        await fs.copyFile(tempPath, originalPath);
+        
+        await fs.unlink(tempPath);
+        
+        return { success: true };
     } catch (error) {
         console.error('Error undeleting file:', error);
-        return false;
+        return { success: false, error: error.message };
     }
 });
 
@@ -136,7 +136,7 @@ function getFfprobePath() {
 
 ipcMain.handle('get-file-metadata', async (event, filePath) => {
     try {
-        const stats = fs.statSync(filePath);
+        const stats = await fs.stat(filePath);
         const isVid = /\.(mp4|webm|mov)$/i.test(filePath);
         
         if (isVid) {
@@ -198,9 +198,30 @@ ipcMain.handle('get-file-metadata', async (event, filePath) => {
     } catch (error) {
         console.error('General metadata error:', error);
         return {
-            size: stats.size,
-            isVideo: isVid,
             error: 'Error getting metadata'
         };
+    }
+});
+
+async function getAllFiles(dir, includeSubfolders) {
+    const entries = await fs.readdir(dir, { withFileTypes: true });
+    const files = await Promise.all(entries.map(async (entry) => {
+        const fullPath = path.join(dir, entry.name);
+        if (entry.isDirectory() && includeSubfolders) {
+            return getAllFiles(fullPath, includeSubfolders);
+        } else if (entry.isFile()) {
+            return fullPath;
+        }
+    }));
+    
+    return files.flat().filter(Boolean);
+}
+
+ipcMain.handle('getDirectoryContents', async (event, dirPath, includeSubfolders) => {
+    try {
+        return await getAllFiles(dirPath, includeSubfolders);
+    } catch (error) {
+        console.error('Error reading directory:', error);
+        return [];
     }
 });
