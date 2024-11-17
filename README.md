@@ -1,6 +1,6 @@
 # Media Deletion Helper
 
-A desktop application built with Electron to help manage and delete media files efficiently.
+A desktop application built with Electron to help go through and delete media files as fast as possible.
 
 ## Features
 
