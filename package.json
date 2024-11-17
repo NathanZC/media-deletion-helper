@@ -30,9 +30,9 @@
     ],
     "extraResources": [
       {
-        "from": "node_modules/ffprobe-static/",
-        "to": "ffprobe-static/",
-        "filter": ["**/*"]
+        "from": "node_modules/ffprobe-static/bin/${platform}/${arch}",
+        "to": "ffprobe-static",
+        "filter": ["ffprobe*"]
       }
     ],
     "asar": true,

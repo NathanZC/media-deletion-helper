@@ -127,6 +127,13 @@ ipcMain.handle('open-directory', async (event, dirPath) => {
     }
 });
 
+function getFfprobePath() {
+    if (app.isPackaged) {
+        return path.join(process.resourcesPath, 'ffprobe-static', process.platform === 'win32' ? 'ffprobe.exe' : 'ffprobe');
+    }
+    return ffprobe.path;
+}
+
 ipcMain.handle('get-file-metadata', async (event, filePath) => {
     try {
         const stats = fs.statSync(filePath);
@@ -134,8 +141,10 @@ ipcMain.handle('get-file-metadata', async (event, filePath) => {
         
         if (isVid) {
             return new Promise((resolve) => {
-                exec(`${ffprobe.path} -v quiet -print_format json -show_format -show_streams "${filePath}"`, (error, stdout) => {
+                const ffprobePath = getFfprobePath();
+                exec(`"${ffprobePath}" -v quiet -print_format json -show_format -show_streams "${filePath}"`, (error, stdout) => {
                     if (error) {
+                        console.error('FFprobe error:', error);
                         resolve({
                             size: stats.size,
                             isVideo: true,
@@ -144,16 +153,25 @@ ipcMain.handle('get-file-metadata', async (event, filePath) => {
                         return;
                     }
                     
-                    const metadata = JSON.parse(stdout);
-                    const videoStream = metadata.streams.find(s => s.codec_type === 'video');
-                    
-                    resolve({
-                        size: stats.size,
-                        isVideo: true,
-                        duration: parseFloat(metadata.format.duration),
-                        width: videoStream?.width,
-                        height: videoStream?.height
-                    });
+                    try {
+                        const metadata = JSON.parse(stdout);
+                        const videoStream = metadata.streams.find(s => s.codec_type === 'video');
+                        
+                        resolve({
+                            size: stats.size,
+                            isVideo: true,
+                            duration: parseFloat(metadata.format.duration),
+                            width: videoStream?.width,
+                            height: videoStream?.height
+                        });
+                    } catch (parseError) {
+                        console.error('Metadata parse error:', parseError);
+                        resolve({
+                            size: stats.size,
+                            isVideo: true,
+                            error: 'Could not parse video metadata'
+                        });
+                    }
                 });
             });
         }
@@ -178,7 +196,11 @@ ipcMain.handle('get-file-metadata', async (event, filePath) => {
         
         return { size: stats.size, isVideo: false };
     } catch (error) {
-        console.error('Error getting metadata:', error);
-        return { error: 'Failed to get file metadata' };
+        console.error('General metadata error:', error);
+        return {
+            size: stats.size,
+            isVideo: isVid,
+            error: 'Error getting metadata'
+        };
     }
 });
