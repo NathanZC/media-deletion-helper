@@ -3,6 +3,7 @@ const path = require('path');
 const fs = require('fs');
 const { exec } = require('child_process');
 const ffprobe = require('ffprobe-static');
+const sizeOf = require('image-size');
 
 const deletedFilesDir = path.join(app.getPath('temp'), 'image-viewer-deleted');
 
@@ -158,18 +159,21 @@ ipcMain.handle('get-file-metadata', async (event, filePath) => {
         }
         
         if (/\.(jpg|jpeg|png|gif|webp)$/i.test(filePath)) {
-            const dimensions = await new Promise((resolve) => {
-                const img = new Image();
-                img.onload = () => resolve({ width: img.width, height: img.height });
-                img.onerror = () => resolve(null);
-                img.src = `file://${filePath}`;
-            });
-            
-            return {
-                size: stats.size,
-                isVideo: false,
-                ...dimensions
-            };
+            try {
+                const dimensions = sizeOf(filePath);
+                return {
+                    size: stats.size,
+                    width: dimensions.width,
+                    height: dimensions.height,
+                    isVideo: false
+                };
+            } catch (err) {
+                console.error(`Error getting dimensions for ${filePath}:`, err);
+                return {
+                    size: stats.size,
+                    isVideo: false
+                };
+            }
         }
         
         return { size: stats.size, isVideo: false };
