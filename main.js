@@ -101,7 +101,6 @@ ipcMain.handle('undelete-image', async (event, originalPath) => {
     try {
         const fileName = path.basename(originalPath);
         const tempPath = path.join(deletedFilesDir, fileName);
-        
         await fs.copyFile(tempPath, originalPath);
         
         await fs.unlink(tempPath);

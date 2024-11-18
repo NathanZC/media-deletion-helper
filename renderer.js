@@ -8,7 +8,7 @@ let videoStartSettings = {
     playbackSpeed: 1,
     skim: {
         enabled: false,
-        playDuration: 3,
+        playDuration: 2,
         skipDuration: 10,
         active: false
     }

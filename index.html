@@ -122,7 +122,8 @@
       .instructions {
         position: fixed;
         bottom: 20px;
-        background-color: rgba(0, 0, 0, 0.7);
+        background-color: var(--instructions-bg);
+        color: var(--instructions-text);
         padding: 10px;
         border-radius: 4px;
       }
@@ -234,17 +235,28 @@
         position: fixed;
         right: 20px;
         top: 20px;
-        background: rgba(0, 0, 0, 0.7);
+        background: var(--button-bg);
         border: none;
         color: white;
-        padding: 10px;
-        border-radius: 4px;
+        padding: 12px 20px;
+        border-radius: 8px;
         cursor: pointer;
         z-index: 1000;
+        font-size: 14px;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        border: 1px solid transparent;
+        transition: all 0.2s ease;
       }
 
       .fullscreen-btn:hover {
-        background: rgba(0, 0, 0, 0.9);
+        background: var(--button-hover);
+        transform: translateY(-1px);
+      }
+
+      .fullscreen-icon {
+        font-size: 16px;
       }
 
       body.fullscreen-mode {
@@ -299,8 +311,8 @@
 
       .directory-controls {
         display: flex;
-        align-items: center;
-        gap: 15px;
+        align-items: stretch;
+        gap: 10px;
         width: 100%;
       }
 
@@ -309,44 +321,58 @@
         align-items: center;
         gap: 10px;
         background: var(--secondary-bg);
-        padding: 10px;
-        border-radius: 4px;
+        padding: 10px 15px;
+        border-radius: 8px;
         flex: 1;
+        border: 1px solid var(--border-color);
       }
 
       #select-btn {
-        padding: 12px 24px;
-        font-size: 16px;
+        padding: 12px 20px;
+        font-size: 14px;
         background-color: var(--button-bg);
         color: white;
         border: none;
-        border-radius: 4px;
+        border-radius: 8px;
         cursor: pointer;
         white-space: nowrap;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        min-width: 150px;
+        justify-content: center;
+        border: 1px solid transparent;
+        transition: all 0.2s ease;
       }
 
       #select-btn:hover {
         background-color: var(--button-hover);
+        transform: translateY(-1px);
       }
 
       #current-dir-path {
-        color: #ccc;
+        color: var(--text-color);
         word-break: break-all;
         flex: 1;
+        opacity: 0.8;
       }
 
       .open-dir-btn {
         padding: 8px 12px;
-        background: #333;
+        background: var(--button-bg);
         border: none;
         color: white;
-        border-radius: 4px;
+        border-radius: 6px;
         cursor: pointer;
         white-space: nowrap;
+        font-size: 14px;
+        transition: all 0.2s ease;
+        border: 1px solid transparent;
       }
 
       .open-dir-btn:hover {
-        background: #444;
+        background: var(--button-hover);
+        transform: translateY(-1px);
       }
 
       .media-types-group {
@@ -426,8 +452,10 @@
         --secondary-bg: #333;
         --hover-bg: #444;
         --border-color: rgba(255, 255, 255, 0.2);
-        --button-bg: #007bff;
-        --button-hover: #0056b3;
+        --button-bg: #8957e5;
+        --button-hover: #6c40b5;
+        --instructions-bg: rgba(0, 0, 0, 0.7);
+        --instructions-text: #ffffff;
       }
 
       :root[data-theme="light"] {
@@ -436,8 +464,10 @@
         --secondary-bg: #e0e0e0;
         --hover-bg: #d0d0d0;
         --border-color: rgba(0, 0, 0, 0.2);
-        --button-bg: #007bff;
-        --button-hover: #0056b3;
+        --button-bg: #2ea44f;
+        --button-hover: #238636;
+        --instructions-bg: rgba(0, 0, 0, 0.6);
+        --instructions-text: #ffffff;
       }
 
       :root[data-theme="pink"] {
@@ -448,6 +478,8 @@
         --border-color: rgba(255, 182, 193, 0.4);
         --button-bg: #ff69b4;
         --button-hover: #ff1493;
+        --instructions-bg: rgba(255, 105, 180, 0.8);
+        --instructions-text: #ffffff;
       }
 
       /* Update existing color properties to use variables */
@@ -476,25 +508,72 @@
       #select-btn:hover {
         background-color: var(--button-hover);
       }
+
+      .settings-btn {
+        background: var(--button-bg);
+        border: none;
+        color: white;
+        padding: 12px;
+        border-radius: 8px;
+        cursor: pointer;
+        font-size: 14px;
+        display: flex;
+        align-items: center;
+        gap: 4px;
+        border: 1px solid transparent;
+        transition: all 0.2s ease;
+        min-width: 42px;
+        justify-content: center;
+      }
+
+      .settings-btn:hover {
+        background: var(--button-hover);
+        transform: translateY(-1px);
+      }
+
+      /* Remove the top-controls container styles since we're not using it anymore */
+      .top-controls {
+        display: none;
+      }
+
+      /* Update fullscreen button back to its original position */
+      .fullscreen-btn {
+        position: fixed;
+        right: 20px;
+        top: 20px;
+        background: var(--button-bg);
+        border: none;
+        color: white;
+        padding: 12px 20px;
+        border-radius: 8px;
+        cursor: pointer;
+        z-index: 1000;
+        font-size: 14px;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        border: 1px solid transparent;
+        transition: all 0.2s ease;
+      }
     </style>
   </head>
   <body>
     <div class="directory-info">
       <div class="directory-controls">
-        <button id="select-btn">Select Directory</button>
+        <button id="toggle-settings" class="settings-btn" title="Settings">
+          ⚙️
+          <span class="toggle-icon">▼</span>
+        </button>
+        <button id="select-btn">📁 Select Directory</button>
         <div class="current-dir-container">
-          <span id="current-dir-path"></span>
+          <span id="current-dir-path">No directory selected</span>
           <button id="open-dir-btn" class="open-dir-btn" style="display: none;">
-            📂 Open in Explorer
+            📂 Open
           </button>
         </div>
       </div>
     </div>
     <div class="settings-container">
-      <button id="toggle-settings" class="toggle-settings-btn">
-        ⚙️ Settings
-        <span class="toggle-icon">▼</span>
-      </button>
       <div class="filter-controls" id="filter-controls">
         <div class="media-types-group">
           <h3 class="media-types-heading">Media Types</h3>
@@ -650,9 +729,15 @@
       ← → Arrow keys to navigate • ↑ Arrow key to delete • ↓ Arrow key to undo
       delete
     </div>
-    <button id="fullscreen-btn" class="fullscreen-btn">
-      <span class="fullscreen-icon">⛶</span>
-    </button>
+    <div class="top-controls">
+      <button id="toggle-settings" class="settings-btn">
+        ⚙️ Settings
+        <span class="toggle-icon">▼</span>
+      </button>
+      <button id="fullscreen-btn" class="fullscreen-btn">
+        <span class="fullscreen-icon">⛶</span>
+      </button>
+    </div>
     <script src="renderer.js"></script>
   </body>
 </html>

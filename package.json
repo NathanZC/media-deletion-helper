@@ -2,7 +2,7 @@
   "name": "media-deletion-helper",
   "version": "1.0.0",
   "description": "A helper application for managing and deleting media files",
-  "author": "Your Name",
+  "author": "Nate",
   "main": "./main.js",
   "scripts": {
     "start": "electron .",
