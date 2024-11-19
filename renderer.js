@@ -452,33 +452,33 @@ function initializeVideoSettings() {
 
 function handleVideoStart() {
     videoElement.addEventListener('loadedmetadata', () => {
-        setVideoStartTime();
-    }, { once: true });
-}
+        // Apply video start settings based on mode
+        switch (videoStartSettings.mode) {
+            case 'fixed':
+                if (videoElement.duration > videoStartSettings.fixedTime) {
+                    videoElement.currentTime = videoStartSettings.fixedTime;
+                }
+                break;
+            case 'percentage':
+                videoElement.currentTime = (videoElement.duration * videoStartSettings.percentage) / 100;
+                break;
+            case 'beginning':
+            default:
+                videoElement.currentTime = 0;
+                break;
+        }
 
-function setVideoStartTime() {
-    let startTime = 0;
-    
-    switch (videoStartSettings.mode) {
-        case 'fixed':
-            if (videoElement.duration > videoStartSettings.fixedTime) {
-                startTime = videoStartSettings.fixedTime;
-            }
-            break;
-        case 'percentage':
-            startTime = (videoElement.duration * videoStartSettings.percentage) / 100;
-            break;
-    }
-    
-    videoElement.currentTime = startTime;
-    videoElement.playbackRate = videoStartSettings.playbackSpeed;
-    
-    if (videoStartSettings.skim.enabled) {
-        videoStartSettings.skim.lastSkipTime = startTime;
-        startSkimming();
-    } else {
-        videoElement.play();
-    }
+        // Apply playback speed
+        videoElement.playbackRate = videoStartSettings.playbackSpeed;
+
+        // Start skimming if enabled, otherwise just play
+        if (videoStartSettings.skim.enabled) {
+            videoStartSettings.skim.lastSkipTime = videoElement.currentTime;
+            startSkimming();
+        } else {
+            videoElement.play();
+        }
+    }, { once: true });
 }
 
 function initializeSettingsCollapse() {
@@ -1556,4 +1556,45 @@ document.getElementById('auto-advance-delay').addEventListener('change', (e) => 
     if (autoAdvanceEnabled && !isVideo(images[currentIndex])) {
         setupAutoAdvance();
     }
+});
+
+// Add this function to renderer.js
+function applyVideoStartSettings() {
+    if (!videoElement) return;
+    
+    switch (videoStartSettings.mode) {
+        case 'fixed':
+            videoElement.currentTime = videoStartSettings.fixedTime;
+            break;
+        case 'percentage':
+            if (videoElement.duration) {
+                videoElement.currentTime = (videoStartSettings.percentage / 100) * videoElement.duration;
+            }
+            break;
+        case 'beginning':
+        default:
+            videoElement.currentTime = 0;
+            break;
+    }
+}
+
+// Add event listeners for the video start settings
+document.querySelectorAll('input[name="video-start"]').forEach(radio => {
+    radio.addEventListener('change', (e) => {
+        videoStartSettings.mode = e.target.value;
+    });
+});
+
+document.getElementById('fixed-start-time').addEventListener('change', (e) => {
+    videoStartSettings.fixedTime = Math.max(0, parseFloat(e.target.value) || 0);
+});
+
+document.getElementById('percentage-start').addEventListener('change', (e) => {
+    videoStartSettings.percentage = Math.min(100, Math.max(0, parseFloat(e.target.value) || 0));
+});
+
+// Modify the video loadedmetadata event handler
+videoElement.addEventListener('loadedmetadata', () => {
+    applyVideoStartSettings();
+    videoElement.playbackRate = videoStartSettings.playbackSpeed;
 });
