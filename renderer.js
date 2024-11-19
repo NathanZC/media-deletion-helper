@@ -23,6 +23,8 @@ let operationQueue = [];
 let isMediaUpdateInProgress = false;
 let isRefreshInProgress = false;
 let undoStack = [];
+let quickSortGroups = {};
+let currentQuickSortGroup = 'group1';
 
 const mediaElement = document.getElementById('current-media');
 const videoElement = document.getElementById('current-video');
@@ -339,7 +341,7 @@ document.addEventListener('keydown', async (event) => {
             deleteCurrentImage();
             break;
         case 'ArrowDown':
-            handleUndo();  // Changed from undoDelete to handleUndo
+            handleUndo();
             break;
         case 'f':
             toggleFullscreen();
@@ -352,8 +354,9 @@ document.addEventListener('keydown', async (event) => {
     // Quick move with number keys (1-9)
     if (!event.ctrlKey && !event.altKey && !isNaN(event.key) && event.key !== '0') {
         const index = parseInt(event.key) - 1;
-        if (index >= 0 && index < quickMoveFolders.length) {
-            moveToQuickFolder(quickMoveFolders[index]);
+        const currentFolders = quickSortGroups[currentQuickSortGroup] || [];
+        if (index >= 0 && index < currentFolders.length) {
+            moveToQuickFolder(currentFolders[index]);
         }
     }
 
@@ -620,7 +623,7 @@ function initializeQuickMove() {
     // Event listener
     enableQuickMove.addEventListener('change', (e) => {
         showQuickMovePanel = e.target.checked;
-        quickMovePanel.style.display = showQuickMovePanel ? 'block' : 'none';
+        document.getElementById('quick-sort-tabs').style.display = showQuickMovePanel ? 'block' : 'none';
         localStorage.setItem('showQuickMovePanel', showQuickMovePanel);
     });
     
@@ -628,22 +631,26 @@ function initializeQuickMove() {
 }
 
 async function addQuickMoveFolder() {
-    if (quickMoveFolders.length >= 9) {
-        alert('Maximum of 9 quick move folders allowed');
+    const currentFolders = quickSortGroups[currentQuickSortGroup] || [];
+    if (currentFolders.length >= 9) {
+        alert('Maximum of 9 quick move folders allowed per group');
         return;
     }
     
     const dir = await window.electronAPI.selectMoveDirectory();
-    if (dir && !quickMoveFolders.includes(dir)) {
-        quickMoveFolders.push(dir);
-        localStorage.setItem('quickMoveFolders', JSON.stringify(quickMoveFolders));
+    if (dir && !currentFolders.includes(dir)) {
+        currentFolders.push(dir);
+        quickSortGroups[currentQuickSortGroup] = currentFolders;
+        localStorage.setItem('quickSortGroups', JSON.stringify(quickSortGroups));
         updateQuickMoveFoldersUI();
     }
 }
 
 function removeQuickMoveFolder(index) {
-    quickMoveFolders.splice(index, 1);
-    localStorage.setItem('quickMoveFolders', JSON.stringify(quickMoveFolders));
+    const currentFolders = quickSortGroups[currentQuickSortGroup] || [];
+    currentFolders.splice(index, 1);
+    quickSortGroups[currentQuickSortGroup] = currentFolders;
+    localStorage.setItem('quickSortGroups', JSON.stringify(quickSortGroups));
     updateQuickMoveFoldersUI();
 }
 
@@ -681,25 +688,23 @@ async function moveToQuickFolder(folderPath) {
 }
 
 function updateQuickMoveFoldersUI() {
-    // Update quick move panel
-    const panelFolders = document.querySelector('.quick-move-folders');
-    let html = '';
+    const currentFolders = quickSortGroups[currentQuickSortGroup] || [];
+    const currentPanel = document.querySelector(`.tab-panel[data-tab="${currentQuickSortGroup}"]`);
+    const panelFolders = currentPanel.querySelector('.quick-move-folders');
     
-    // Generate filled slots plus one empty slot (if not at max)
-    const slotsToShow = Math.min(quickMoveFolders.length + 1, 9);
+    let html = '';
+    const slotsToShow = Math.min(currentFolders.length + 1, 9);
     
     for (let i = 0; i < slotsToShow; i++) {
-        if (i < quickMoveFolders.length) {
-            // Filled slot with remove button
+        if (i < currentFolders.length) {
             html += `
                 <div class="quick-folder-item">
                     <span class="quick-folder-key">${i + 1}</span>
-                    <span class="quick-folder-path" onclick="moveToQuickFolder('${quickMoveFolders[i].replace(/\\/g, '\\\\')}')">${quickMoveFolders[i]}</span>
+                    <span class="quick-folder-path" onclick="moveToQuickFolder('${currentFolders[i].replace(/\\/g, '\\\\')}')">${currentFolders[i]}</span>
                     <span class="quick-folder-remove" onclick="removeQuickMoveFolder(${i})">×</span>
                 </div>
             `;
         } else {
-            // Empty slot (only one)
             html += `
                 <div class="quick-folder-item empty" onclick="addQuickMoveFolder()">
                     <span class="quick-folder-key">${i + 1}</span>
@@ -963,3 +968,72 @@ openFileBtn.addEventListener('click', async () => {
 
 // Initialize media display
 updateMedia();
+
+function initializeQuickSortTabs() {
+    // Load saved groups from localStorage
+    quickSortGroups = JSON.parse(localStorage.getItem('quickSortGroups') || '{"group1": [], "group2": [], "group3": []}');
+    
+    const tabsContainer = document.getElementById('quick-sort-tabs');
+    const tabButtons = document.querySelectorAll('.tab-button');
+    
+    // Show/hide tabs container based on quickmove panel setting
+    tabsContainer.style.display = showQuickMovePanel ? 'block' : 'none';
+    
+    // Initialize the first group as active
+    currentQuickSortGroup = 'group1';
+    document.querySelector('.tab-panel[data-tab="group1"]').classList.add('active');
+    updateQuickMoveFoldersUI();
+    
+    // Add tab switching functionality
+    tabButtons.forEach(button => {
+        if (button.classList.contains('add-tab-button')) return;
+        
+        button.addEventListener('click', () => {
+            // Remove active class from all buttons and panels
+            document.querySelectorAll('.tab-button').forEach(btn => btn.classList.remove('active'));
+            document.querySelectorAll('.tab-panel').forEach(panel => panel.classList.remove('active'));
+            
+            // Add active class to clicked button and corresponding panel
+            button.classList.add('active');
+            const tabName = button.dataset.tab;
+            document.querySelector(`.tab-panel[data-tab="${tabName}"]`).classList.add('active');
+            currentQuickSortGroup = tabName;
+            
+            // Update UI for current group
+            updateQuickMoveFoldersUI();
+        });
+    });
+}
+
+function updateQuickMoveFoldersUI() {
+    const currentFolders = quickSortGroups[currentQuickSortGroup] || [];
+    const currentPanel = document.querySelector(`.tab-panel[data-tab="${currentQuickSortGroup}"]`);
+    const panelFolders = currentPanel.querySelector('.quick-move-folders');
+    
+    let html = '';
+    const slotsToShow = Math.min(currentFolders.length + 1, 9);
+    
+    for (let i = 0; i < slotsToShow; i++) {
+        if (i < currentFolders.length) {
+            html += `
+                <div class="quick-folder-item">
+                    <span class="quick-folder-key">${i + 1}</span>
+                    <span class="quick-folder-path" onclick="moveToQuickFolder('${currentFolders[i].replace(/\\/g, '\\\\')}')">${currentFolders[i]}</span>
+                    <span class="quick-folder-remove" onclick="removeQuickMoveFolder(${i})">×</span>
+                </div>
+            `;
+        } else {
+            html += `
+                <div class="quick-folder-item empty" onclick="addQuickMoveFolder()">
+                    <span class="quick-folder-key">${i + 1}</span>
+                    <span class="quick-folder-path">Click to add folder...</span>
+                </div>
+            `;
+        }
+    }
+    
+    panelFolders.innerHTML = html;
+}
+
+// Add to your existing initialization calls
+initializeQuickSortTabs();

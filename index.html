@@ -811,6 +811,68 @@
         margin: 0;
         padding: 0;
       }
+
+      .quick-sort-tabs {
+        position: fixed;
+        right: 20px;
+        top: 50%;
+        transform: translateY(-50%);
+        background: var(--secondary-bg);
+        border-radius: 8px;
+        padding: 15px;
+        display: none;
+        max-width: 300px;
+        border: 1px solid var(--border-color);
+        z-index: 1000;
+        max-height: 80vh;
+        overflow-y: auto;
+      }
+
+      .tab-buttons {
+        display: flex;
+        gap: 5px;
+        margin-bottom: 15px;
+        border-bottom: 1px solid var(--border-color);
+        padding-bottom: 10px;
+      }
+
+      .tab-button {
+        padding: 8px 16px;
+        background: var(--button-bg);
+        border: none;
+        color: var(--text-color);
+        border-radius: 4px;
+        cursor: pointer;
+        transition: all 0.2s ease;
+      }
+
+      .tab-button.active {
+        background: var(--button-hover);
+      }
+
+      .add-tab-button {
+        padding: 8px 12px;
+        background: var(--button-bg);
+        border: none;
+        color: var(--text-color);
+        border-radius: 4px;
+        cursor: pointer;
+        transition: all 0.2s ease;
+      }
+
+      .tab-panels {
+        position: relative;
+        max-height: calc(80vh - 100px);
+        overflow-y: auto;
+      }
+
+      .tab-panel {
+        display: none;
+      }
+
+      .tab-panel.active {
+        display: block;
+      }
     </style>
   </head>
   <body>
@@ -1016,6 +1078,25 @@
       <button id="fullscreen-btn" class="fullscreen-btn">
         <span class="fullscreen-icon">⛶</span>
       </button>
+    </div>
+    <div id="quick-sort-tabs" class="quick-sort-tabs">
+      <div class="tab-buttons">
+        <button class="tab-button active" data-tab="group1">Group 1</button>
+        <button class="tab-button" data-tab="group2">Group 2</button>
+        <button class="tab-button" data-tab="group3">Group 3</button>
+        <button class="add-tab-button">+</button>
+      </div>
+      <div class="tab-panels">
+        <div class="tab-panel active" data-tab="group1">
+          <div class="quick-move-folders"></div>
+        </div>
+        <div class="tab-panel" data-tab="group2">
+          <div class="quick-move-folders"></div>
+        </div>
+        <div class="tab-panel" data-tab="group3">
+          <div class="quick-move-folders"></div>
+        </div>
+      </div>
     </div>
     <script src="renderer.js"></script>
   </body>
