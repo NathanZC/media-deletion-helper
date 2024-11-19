@@ -967,6 +967,14 @@ openFileBtn.addEventListener('click', async () => {
     }
 });
 
+// Add event listener for ESC key
+document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape' && isFullscreen) {
+        document.body.classList.remove('fullscreen-mode');
+        window.electronAPI.setFullscreen(false);
+        isFullscreen = false;
+    }
+});
 // Initialize media display
 updateMedia();
 
