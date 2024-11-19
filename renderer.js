@@ -341,6 +341,9 @@ document.addEventListener('keydown', async (event) => {
         case 'f':
             toggleFullscreen();
             break;
+        case 'm':
+            moveCurrentFile();
+            break;
     }
 
     // Quick move with number keys (1-9)
@@ -916,5 +919,35 @@ async function refreshDirectoryListing() {
         console.error('Error refreshing directory:', error);
     } finally {
         isRefreshInProgress = false;
+    }
+}
+
+async function moveCurrentFile() {
+    if (images.length === 0) return;
+    
+    const currentFile = images[currentIndex];
+    
+    // Stop any playing media
+    stopCurrentMedia();
+    await new Promise(resolve => setTimeout(resolve, 100));
+    
+    try {
+        // Let user select destination directory
+        const destinationDir = await window.electronAPI.selectMoveDirectory();
+        if (!destinationDir) return; // User cancelled selection
+        
+        const result = await window.electronAPI.moveFile(currentFile, destinationDir);
+        if (result.success) {
+            // Remove the moved file from our array
+            images.splice(currentIndex, 1);
+            if (currentIndex >= images.length) {
+                currentIndex = Math.max(0, images.length - 1);
+            }
+            await updateMedia();
+        } else {
+            console.error('Failed to move file:', result.error);
+        }
+    } catch (error) {
+        console.error('Error moving file:', error);
     }
 }
