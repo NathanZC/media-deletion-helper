@@ -352,10 +352,23 @@ document.addEventListener('keydown', async (event) => {
             break;
     }
 
-    // Quick move with number keys (1-9)
-    if (!event.ctrlKey && !event.altKey && !isNaN(event.key) && event.key !== '0') {
-        const index = parseInt(event.key) - 1;
+    // Quick move with number keys (1-9) and letter keys (Q-P)
+    if (!event.ctrlKey && !event.altKey) {
         const currentFolders = quickSortGroups[currentQuickSortGroup] || [];
+        let index = -1;
+
+        if (!isNaN(event.key) && event.key !== '0') {
+            // Handle number keys 1-9
+            index = parseInt(event.key) - 1;
+        } else {
+            // Handle letter keys Q-P
+            const letterKeys = 'qwertyuiop';
+            const letterIndex = letterKeys.indexOf(event.key.toLowerCase());
+            if (letterIndex !== -1) {
+                index = letterIndex + 9; // Start letters after the numbers
+            }
+        }
+
         if (index >= 0 && index < currentFolders.length) {
             moveToQuickFolder(currentFolders[index]);
         }
@@ -633,8 +646,8 @@ function initializeQuickMove() {
 
 async function addQuickMoveFolder() {
     const currentFolders = quickSortGroups[currentQuickSortGroup] || [];
-    if (currentFolders.length >= 9) {
-        alert('Maximum of 9 quick move folders allowed per group');
+    if (currentFolders.length >= 19) {
+        alert('Maximum of 19 quick move folders allowed per group');
         return;
     }
     
@@ -694,21 +707,24 @@ function updateQuickMoveFoldersUI() {
     const panelFolders = currentPanel.querySelector('.quick-move-folders');
     
     let html = '';
-    const slotsToShow = Math.min(currentFolders.length + 1, 9);
+    const slotsToShow = Math.min(currentFolders.length + 1, 19);
+    const letterKeys = 'QWERTYUIOP';
     
     for (let i = 0; i < slotsToShow; i++) {
         if (i < currentFolders.length) {
+            const keyLabel = i < 9 ? (i + 1) : letterKeys[i - 9];
             html += `
                 <div class="quick-folder-item">
-                    <span class="quick-folder-key">${i + 1}</span>
+                    <span class="quick-folder-key">${keyLabel}</span>
                     <span class="quick-folder-path" onclick="moveToQuickFolder('${currentFolders[i].replace(/\\/g, '\\\\')}')">${currentFolders[i]}</span>
                     <span class="quick-folder-remove" onclick="removeQuickMoveFolder(${i})">×</span>
                 </div>
             `;
         } else {
+            const keyLabel = i < 9 ? (i + 1) : letterKeys[i - 9];
             html += `
                 <div class="quick-folder-item empty" onclick="addQuickMoveFolder()">
-                    <span class="quick-folder-key">${i + 1}</span>
+                    <span class="quick-folder-key">${keyLabel}</span>
                     <span class="quick-folder-path">Click to add folder...</span>
                 </div>
             `;
@@ -1210,21 +1226,24 @@ function updateQuickMoveFoldersUI() {
     const panelFolders = currentPanel.querySelector('.quick-move-folders');
     
     let html = '';
-    const slotsToShow = Math.min(currentFolders.length + 1, 9);
+    const slotsToShow = Math.min(currentFolders.length + 1, 19);
+    const letterKeys = 'QWERTYUIOP';
     
     for (let i = 0; i < slotsToShow; i++) {
         if (i < currentFolders.length) {
+            const keyLabel = i < 9 ? (i + 1) : letterKeys[i - 9];
             html += `
                 <div class="quick-folder-item">
-                    <span class="quick-folder-key">${i + 1}</span>
+                    <span class="quick-folder-key">${keyLabel}</span>
                     <span class="quick-folder-path" onclick="moveToQuickFolder('${currentFolders[i].replace(/\\/g, '\\\\')}')">${currentFolders[i]}</span>
                     <span class="quick-folder-remove" onclick="removeQuickMoveFolder(${i})">×</span>
                 </div>
             `;
         } else {
+            const keyLabel = i < 9 ? (i + 1) : letterKeys[i - 9];
             html += `
                 <div class="quick-folder-item empty" onclick="addQuickMoveFolder()">
-                    <span class="quick-folder-key">${i + 1}</span>
+                    <span class="quick-folder-key">${keyLabel}</span>
                     <span class="quick-folder-path">Click to add folder...</span>
                 </div>
             `;
