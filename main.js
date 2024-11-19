@@ -202,12 +202,12 @@ ipcMain.handle('get-file-metadata', async (event, filePath) => {
     }
 });
 
-async function getAllFiles(dir, includeSubfolders) {
+async function getAllFiles(dir, includeSubfolders, maxDepth = 0, currentDepth = 0) {
     const entries = await fs.readdir(dir, { withFileTypes: true });
     const files = await Promise.all(entries.map(async (entry) => {
         const fullPath = path.join(dir, entry.name);
-        if (entry.isDirectory() && includeSubfolders) {
-            return getAllFiles(fullPath, includeSubfolders);
+        if (entry.isDirectory() && includeSubfolders && (maxDepth === 0 || currentDepth < maxDepth)) {
+            return getAllFiles(fullPath, includeSubfolders, maxDepth, currentDepth + 1);
         } else if (entry.isFile()) {
             return fullPath;
         }
@@ -216,11 +216,52 @@ async function getAllFiles(dir, includeSubfolders) {
     return files.flat().filter(Boolean);
 }
 
-ipcMain.handle('getDirectoryContents', async (event, dirPath, includeSubfolders) => {
+ipcMain.handle('getDirectoryContents', async (event, dirPath, includeSubfolders, depth) => {
     try {
-        return await getAllFiles(dirPath, includeSubfolders);
+        return await getAllFiles(dirPath, includeSubfolders, depth);
     } catch (error) {
         console.error('Error reading directory:', error);
         return [];
+    }
+});
+
+ipcMain.handle('select-move-directory', async () => {
+    const result = await dialog.showOpenDialog(mainWindow, {
+        properties: ['openDirectory'],
+        title: 'Select Destination Folder'
+    });
+    if (!result.canceled) {
+        return result.filePaths[0];
+    }
+    return null;
+});
+
+ipcMain.handle('move-file', async (event, sourcePath, destinationDir) => {
+    try {
+        const fileName = path.basename(sourcePath);
+        const newPath = path.join(destinationDir, fileName);
+        await fs.rename(sourcePath, newPath);
+        return {
+            success: true,
+            newPath: newPath
+        };
+    } catch (error) {
+        return {
+            success: false,
+            error: error.message
+        };
+    }
+});
+
+ipcMain.handle('getParentDirectory', async (event, filePath) => {
+    return path.dirname(filePath);
+});
+
+ipcMain.handle('fileExists', async (event, filePath) => {
+    try {
+        await fs.access(filePath);
+        return true;
+    } catch {
+        return false;
     }
 });

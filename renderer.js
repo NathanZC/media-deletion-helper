@@ -14,6 +14,15 @@ let videoStartSettings = {
     }
 };
 let includeSubfolders = false;
+let subfolderDepth = 0;
+let quickMoveFolders = [];
+let showQuickMovePanel = false;
+let movedFiles = [];
+let isOperationInProgress = false;
+let operationQueue = [];
+let isMediaUpdateInProgress = false;
+let isRefreshInProgress = false;
+let undoStack = [];
 
 const mediaElement = document.getElementById('current-media');
 const videoElement = document.getElementById('current-video');
@@ -90,8 +99,8 @@ function stopCurrentMedia() {
     }
 }
 
-async function scanDirectory(dirPath, includeSubfolders) {
-    let files = await window.electronAPI.getDirectoryContents(dirPath, includeSubfolders);
+async function scanDirectory(dirPath, includeSubfolders, depth = 0) {
+    let files = await window.electronAPI.getDirectoryContents(dirPath, includeSubfolders, depth);
     return files;
 }
 
@@ -113,57 +122,90 @@ async function loadDirectory() {
 }
 
 async function updateMedia() {
-    if (images.length === 0) {
-        stopCurrentMedia();
-        mediaElement.style.display = 'none';
-        videoElement.style.display = 'none';
-        counterElement.textContent = 'No media';
-        fileNameElement.textContent = '';
-        return;
+    if (isMediaUpdateInProgress) {
+        return; // Skip if already updating
     }
     
-    const currentFile = images[currentIndex];
-    
-    // Stop current media before loading new one
-    stopCurrentMedia();
+    isMediaUpdateInProgress = true;
     
     try {
-        const fileName = currentFile.split('\\').pop().split('/').pop();
-        
-        // Get file metadata
-        const metadata = await window.electronAPI.getFileMetadata(currentFile);
-        
-        // Format file size
-        const fileSize = formatFileSize(metadata.size);
-        
-        // Format resolution
-        const resolution = metadata.width && metadata.height ? 
-            `${metadata.width}x${metadata.height}` : 'Unknown';
-        
-        // Format duration for videos
-        const duration = metadata.isVideo && metadata.duration ? 
-            formatDuration(metadata.duration) : '';
-        
-        // Create info string
-        const infoString = `${fileName} (${resolution}, ${fileSize}${duration ? `, ${duration}` : ''})`;
-        fileNameElement.textContent = infoString;
-        
-        if (isVideo(currentFile)) {
+        if (images.length === 0) {
+            stopCurrentMedia();
             mediaElement.style.display = 'none';
-            videoElement.style.display = 'block';
-            videoElement.src = `file://${currentFile}`;
-            videoElement.controls = !isFullscreen;
-            handleVideoStart();
-        } else {
-            mediaElement.style.display = 'block';
             videoElement.style.display = 'none';
-            mediaElement.src = `file://${currentFile}`;
+            counterElement.textContent = 'No media';
+            fileNameElement.textContent = '';
+            return;
         }
         
-        counterElement.textContent = `File ${currentIndex + 1} of ${images.length}`;
-    } catch (error) {
-        console.error('Error updating media:', error);
-        fileNameElement.textContent = 'Error loading file';
+        const currentFile = images[currentIndex];
+        
+        // Stop current media before loading new one
+        stopCurrentMedia();
+        
+        try {
+            // Check if file exists before trying to get metadata
+            const fileExists = await window.electronAPI.fileExists(currentFile);
+            if (!fileExists) {
+                throw new Error('File not found');
+            }
+            
+            const fileName = currentFile.split('\\').pop().split('/').pop();
+            
+            // Get file metadata with retry
+            let metadata = null;
+            let retryCount = 0;
+            while (retryCount < 3) {
+                try {
+                    metadata = await window.electronAPI.getFileMetadata(currentFile);
+                    break;
+                } catch (error) {
+                    retryCount++;
+                    if (retryCount === 3) throw error;
+                    await new Promise(resolve => setTimeout(resolve, 100)); // Wait before retry
+                }
+            }
+            
+            // Format file size
+            const fileSize = formatFileSize(metadata.size);
+            
+            // Format resolution
+            const resolution = metadata.width && metadata.height ? 
+                `${metadata.width}x${metadata.height}` : 'Unknown';
+            
+            // Format duration for videos
+            const duration = metadata.isVideo && metadata.duration ? 
+                formatDuration(metadata.duration) : '';
+            
+            // Create info string
+            const infoString = `${fileName} (${resolution}, ${fileSize}${duration ? `, ${duration}` : ''})`;
+            fileNameElement.textContent = infoString;
+            
+            if (isVideo(currentFile)) {
+                mediaElement.style.display = 'none';
+                videoElement.style.display = 'block';
+                videoElement.src = `file://${currentFile}`;
+                videoElement.controls = !isFullscreen;
+                handleVideoStart();
+            } else {
+                mediaElement.style.display = 'block';
+                videoElement.style.display = 'none';
+                mediaElement.src = `file://${currentFile}`;
+            }
+            
+            counterElement.textContent = `File ${currentIndex + 1} of ${images.length}`;
+        } catch (error) {
+            console.error('Error updating media:', error);
+            // Remove the problematic file from our arrays
+            cleanupMissingFile(currentFile);
+            // Try to update with next file if available
+            if (images.length > 0) {
+                currentIndex = Math.min(currentIndex, images.length - 1);
+                await updateMedia();
+            }
+        }
+    } finally {
+        isMediaUpdateInProgress = false;
     }
 }
 
@@ -187,76 +229,94 @@ function formatDuration(seconds) {
 }
 
 async function deleteCurrentImage() {
-    if (images.length === 0) return;
-    
-    const currentFile = images[currentIndex];
-    
-    // Stop media playback before deletion
-    stopCurrentMedia();
-    
-    // Small delay to ensure resources are freed
-    await new Promise(resolve => setTimeout(resolve, 100));
-    
-    try {
-        const result = await window.electronAPI.deleteImage(currentFile);
-        if (result.success) {
-            deletedImages.push({ originalPath: currentFile, tempPath: result.tempPath });
-            images.splice(currentIndex, 1);
-            if (currentIndex >= images.length) {
-                currentIndex = Math.max(0, images.length - 1);
+    operationQueue.push(async () => {
+        if (images.length === 0) return;
+        
+        const currentFile = images[currentIndex];
+        
+        stopCurrentMedia();
+        await new Promise(resolve => setTimeout(resolve, 100));
+        
+        try {
+            const result = await window.electronAPI.deleteImage(currentFile);
+            if (result.success) {
+                // Add to unified undo stack
+                undoStack.push({
+                    type: 'delete',
+                    data: { originalPath: currentFile, tempPath: result.tempPath }
+                });
+                
+                images.splice(currentIndex, 1);
+                if (currentIndex >= images.length) {
+                    currentIndex = Math.max(0, images.length - 1);
+                }
+                await updateMedia();
+            } else {
+                console.error('Failed to delete file:', result.error);
             }
-            updateMedia();
-        } else {
-            console.error('Failed to delete file:', result.error);
+        } catch (error) {
+            console.error('Error in deleteCurrentImage:', error);
         }
-    } catch (error) {
-        console.error('Error in deleteCurrentImage:', error);
-    }
+    });
+    
+    processNextOperation();
 }
 
 async function undoDelete() {
-    if (deletedImages.length === 0) return;
-    
-    // Stop current media before file operations
-    stopCurrentMedia();
-    
-    // Small delay to ensure resources are freed
-    await new Promise(resolve => setTimeout(resolve, 100));
-    
-    const lastDeleted = deletedImages.pop();
-    try {
-        const result = await window.electronAPI.undeleteImage(lastDeleted.originalPath);
-        if (result.success) {
-            // Find the correct position to insert the restored file
-            let insertIndex = 0;
-            while (insertIndex < images.length && 
-                   images[insertIndex].localeCompare(lastDeleted.originalPath) < 0) {
-                insertIndex++;
+    // Queue the undo operation
+    operationQueue.push(async () => {
+        if (deletedImages.length === 0) return;
+        
+        // Stop current media before file operations
+        stopCurrentMedia();
+        
+        // Small delay to ensure resources are freed
+        await new Promise(resolve => setTimeout(resolve, 100));
+        
+        const lastDeleted = deletedImages.pop();
+        try {
+            const result = await window.electronAPI.undeleteImage(lastDeleted.originalPath);
+            if (result.success) {
+                // Wait for file system
+                await new Promise(resolve => setTimeout(resolve, 100));
+                
+                // Refresh directory listing
+                await refreshDirectoryListing();
+                
+                // Find the correct position to insert the restored file
+                let insertIndex = 0;
+                while (insertIndex < images.length && 
+                       images[insertIndex].localeCompare(lastDeleted.originalPath) < 0) {
+                    insertIndex++;
+                }
+                
+                // Make sure the file isn't already in the array
+                if (!images.includes(lastDeleted.originalPath)) {
+                    images.splice(insertIndex, 0, lastDeleted.originalPath);
+                }
+                
+                currentIndex = insertIndex;
+                await updateMedia();
+            } else {
+                console.error('Failed to undelete file:', result.error);
+                deletedImages.push(lastDeleted); // Put it back in the deleted list if failed
             }
-            images.splice(insertIndex, 0, lastDeleted.originalPath);
-            currentIndex = insertIndex;
-            updateMedia();
-        } else {
-            console.error('Failed to undelete file:', result.error);
+        } catch (error) {
+            console.error('Error in undoDelete:', error);
             deletedImages.push(lastDeleted); // Put it back in the deleted list if failed
+            await refreshDirectoryListing(); // Try to refresh directory listing
         }
-    } catch (error) {
-        console.error('Error in undoDelete:', error);
-        deletedImages.push(lastDeleted); // Put it back in the deleted list if failed
-    }
+    });
+    
+    processNextOperation();
 }
 
 selectButton.addEventListener('click', loadDirectory);
 
-document.addEventListener('keydown', (event) => {
+document.addEventListener('keydown', async (event) => {
     // Always prevent default behavior for arrow keys
     if (['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown'].includes(event.key)) {
         event.preventDefault();
-    }
-
-    if (event.key === 'Escape' && isFullscreen) {
-        toggleFullscreen();
-        return;
     }
 
     switch (event.key) {
@@ -276,11 +336,26 @@ document.addEventListener('keydown', (event) => {
             deleteCurrentImage();
             break;
         case 'ArrowDown':
-            undoDelete();
+            handleUndo();  // Changed from undoDelete to handleUndo
             break;
         case 'f':
             toggleFullscreen();
             break;
+    }
+
+    // Quick move with number keys (1-9)
+    if (!event.ctrlKey && !event.altKey && !isNaN(event.key) && event.key !== '0') {
+        const index = parseInt(event.key) - 1;
+        if (index >= 0 && index < quickMoveFolders.length) {
+            moveToQuickFolder(quickMoveFolders[index]);
+        }
+    }
+
+    // Add Ctrl+Z for undo move
+    if (event.ctrlKey && event.key.toLowerCase() === 'z') {
+        event.preventDefault();
+        await handleUndo();
+        return;
     }
 });
 
@@ -477,24 +552,36 @@ initializeExtrasSettings();
 document.getElementById('include-subfolders').addEventListener('change', async (e) => {
     includeSubfolders = e.target.checked;
     if (currentDirectory) {
-        // Rescan directory with new subfolder preference
-        window.fullDirectoryListing = await scanDirectory(currentDirectory, includeSubfolders);
+        window.fullDirectoryListing = await scanDirectory(currentDirectory, includeSubfolders, subfolderDepth);
         filterFiles();
     }
-    // Save preference
     localStorage.setItem('includeSubfolders', includeSubfolders);
 });
 
-// Add this to your initialization code
+document.getElementById('subfolder-depth').addEventListener('change', async (e) => {
+    subfolderDepth = parseInt(e.target.value) || 0;
+    if (currentDirectory && includeSubfolders) {
+        window.fullDirectoryListing = await scanDirectory(currentDirectory, includeSubfolders, subfolderDepth);
+        filterFiles();
+    }
+    localStorage.setItem('subfolderDepth', subfolderDepth);
+});
+
 function initializeSubfolderSetting() {
     const subfoldersToggle = document.getElementById('include-subfolders');
-    // Load saved preference
+    const depthInput = document.getElementById('subfolder-depth');
+    
     includeSubfolders = localStorage.getItem('includeSubfolders') === 'true';
+    subfolderDepth = parseInt(localStorage.getItem('subfolderDepth')) || 0;
+    
     subfoldersToggle.checked = includeSubfolders;
+    depthInput.value = subfolderDepth;
+    depthInput.disabled = !includeSubfolders;
+    
+    subfoldersToggle.addEventListener('change', (e) => {
+        depthInput.disabled = !e.target.checked;
+    });
 }
-
-// Add this to your other initialization calls
-initializeSubfolderSetting();
 
 function initializeThemeSettings() {
     const savedTheme = localStorage.getItem('theme') || 'dark';
@@ -510,5 +597,324 @@ function initializeThemeSettings() {
     });
 }
 
-// Add this to your initialization calls
 initializeThemeSettings();
+
+function initializeQuickMove() {
+    // Load saved settings
+    quickMoveFolders = JSON.parse(localStorage.getItem('quickMoveFolders') || '[]');
+    showQuickMovePanel = localStorage.getItem('showQuickMovePanel') === 'true';
+    
+    // Initialize UI
+    const enableQuickMove = document.getElementById('enable-quick-move');
+    const quickMovePanel = document.getElementById('quick-move-panel');
+    
+    enableQuickMove.checked = showQuickMovePanel;
+    quickMovePanel.style.display = showQuickMovePanel ? 'block' : 'none';
+    
+    // Event listener
+    enableQuickMove.addEventListener('change', (e) => {
+        showQuickMovePanel = e.target.checked;
+        quickMovePanel.style.display = showQuickMovePanel ? 'block' : 'none';
+        localStorage.setItem('showQuickMovePanel', showQuickMovePanel);
+    });
+    
+    updateQuickMoveFoldersUI();
+}
+
+async function addQuickMoveFolder() {
+    if (quickMoveFolders.length >= 9) {
+        alert('Maximum of 9 quick move folders allowed');
+        return;
+    }
+    
+    const dir = await window.electronAPI.selectMoveDirectory();
+    if (dir && !quickMoveFolders.includes(dir)) {
+        quickMoveFolders.push(dir);
+        localStorage.setItem('quickMoveFolders', JSON.stringify(quickMoveFolders));
+        updateQuickMoveFoldersUI();
+    }
+}
+
+function removeQuickMoveFolder(index) {
+    quickMoveFolders.splice(index, 1);
+    localStorage.setItem('quickMoveFolders', JSON.stringify(quickMoveFolders));
+    updateQuickMoveFoldersUI();
+}
+
+async function moveToQuickFolder(folderPath) {
+    if (images.length === 0) return;
+    
+    const currentFile = images[currentIndex];
+    
+    stopCurrentMedia();
+    await new Promise(resolve => setTimeout(resolve, 100));
+    
+    try {
+        const result = await window.electronAPI.moveFile(currentFile, folderPath);
+        if (result.success) {
+            // Add to unified undo stack
+            undoStack.push({
+                type: 'move',
+                data: {
+                    sourcePath: currentFile,
+                    destinationPath: result.newPath
+                }
+            });
+            
+            images.splice(currentIndex, 1);
+            if (currentIndex >= images.length) {
+                currentIndex = Math.max(0, images.length - 1);
+            }
+            await updateMedia();
+        } else {
+            console.error('Failed to move file:', result.error);
+        }
+    } catch (error) {
+        console.error('Error moving file:', error);
+    }
+}
+
+function updateQuickMoveFoldersUI() {
+    // Update quick move panel
+    const panelFolders = document.querySelector('.quick-move-folders');
+    let html = '';
+    
+    // Generate filled slots plus one empty slot (if not at max)
+    const slotsToShow = Math.min(quickMoveFolders.length + 1, 9);
+    
+    for (let i = 0; i < slotsToShow; i++) {
+        if (i < quickMoveFolders.length) {
+            // Filled slot with remove button
+            html += `
+                <div class="quick-folder-item">
+                    <span class="quick-folder-key">${i + 1}</span>
+                    <span class="quick-folder-path" onclick="moveToQuickFolder('${quickMoveFolders[i].replace(/\\/g, '\\\\')}')">${quickMoveFolders[i]}</span>
+                    <span class="quick-folder-remove" onclick="removeQuickMoveFolder(${i})">×</span>
+                </div>
+            `;
+        } else {
+            // Empty slot (only one)
+            html += `
+                <div class="quick-folder-item empty" onclick="addQuickMoveFolder()">
+                    <span class="quick-folder-key">${i + 1}</span>
+                    <span class="quick-folder-path">Click to add folder...</span>
+                </div>
+            `;
+        }
+    }
+    
+    panelFolders.innerHTML = html;
+}
+
+// Add to your existing initialization calls
+initializeQuickMove();
+
+// Debounced operation handler
+async function processNextOperation() {
+    if (isOperationInProgress || operationQueue.length === 0) return;
+    
+    isOperationInProgress = true;
+    try {
+        await operationQueue.shift()();
+    } catch (error) {
+        console.error('Operation error:', error);
+    } finally {
+        isOperationInProgress = false;
+        if (operationQueue.length > 0) {
+            setTimeout(processNextOperation, 50); // Small delay between operations
+        }
+    }
+}
+
+// New unified undo function
+async function handleUndo() {
+    operationQueue.push(async () => {
+        if (undoStack.length === 0) return;
+        
+        const lastAction = undoStack.pop();
+        let result;
+        let restoredPath;
+        
+        try {
+            // Stop current media before any file operations
+            stopCurrentMedia();
+            
+            switch (lastAction.type) {
+                case 'delete':
+                    result = await window.electronAPI.undeleteImage(lastAction.data.originalPath);
+                    restoredPath = lastAction.data.originalPath;
+                    break;
+                    
+                case 'move':
+                    const parentDir = await window.electronAPI.getParentDirectory(lastAction.data.sourcePath);
+                    result = await window.electronAPI.moveFile(
+                        lastAction.data.destinationPath, 
+                        parentDir
+                    );
+                    restoredPath = lastAction.data.sourcePath;
+                    break;
+            }
+            
+            if (!result.success) {
+                throw new Error(result.error || 'Failed to undo action');
+            }
+
+            // Quick check if file exists after operation
+            const fileExists = await window.electronAPI.fileExists(restoredPath);
+            if (!fileExists) {
+                throw new Error('Restored file not found');
+            }
+
+            // Add file to full listing if not present
+            if (!window.fullDirectoryListing.includes(restoredPath)) {
+                window.fullDirectoryListing.push(restoredPath);
+                window.fullDirectoryListing.sort();
+            }
+
+            // Re-filter files with current format settings
+            const enabledFormats = getEnabledFormats();
+            const formatRegex = new RegExp(`\\.(${enabledFormats.join('|')})$`, 'i');
+            
+            // Update images array directly
+            if (formatRegex.test(restoredPath)) {
+                // Find the correct position to insert the file
+                let insertIndex = 0;
+                while (insertIndex < images.length && 
+                       images[insertIndex].localeCompare(restoredPath) < 0) {
+                    insertIndex++;
+                }
+                
+                // Insert the file if it's not already there
+                if (!images.includes(restoredPath)) {
+                    images.splice(insertIndex, 0, restoredPath);
+                    currentIndex = insertIndex;
+                } else {
+                    currentIndex = images.indexOf(restoredPath);
+                }
+
+                // Update the media display
+                await updateMedia();
+
+                // Handle video specific setup if needed
+                if (isVideo(restoredPath)) {
+                    videoElement.src = `file://${restoredPath}`;
+                    videoElement.addEventListener('loadedmetadata', () => {
+                        setVideoStartTime();
+                        videoElement.play();
+                    }, { once: true });
+                }
+            }
+
+        } catch (error) {
+            console.error('Error in handleUndo:', error);
+            undoStack.push(lastAction); // Put the action back on the stack
+            await refreshDirectoryListing(); // Fallback to full refresh
+        }
+    });
+    
+    processNextOperation();
+}
+
+// Helper function to update the counter display
+function updateCounter(current, total) {
+    const counter = document.getElementById('image-counter');
+    if (counter) {
+        counter.textContent = `${current} / ${total}`;
+    }
+}
+
+async function handleSuccessfulUndo(lastMove) {
+    try {
+        // Wait a bit to ensure file system has completed the move
+        await new Promise(resolve => setTimeout(resolve, 100));
+        
+        // Refresh the directory listing
+        await refreshDirectoryListing();
+        
+        // Find the restored file in the filtered images array
+        const restoredIndex = images.indexOf(lastMove.sourcePath);
+        if (restoredIndex !== -1) {
+            currentIndex = restoredIndex;
+        } else {
+            // If not found in current filter, check if it exists
+            const fileExists = await window.electronAPI.fileExists(lastMove.sourcePath);
+            if (fileExists) {
+                // Force a re-filter to include the file
+                if (!window.fullDirectoryListing.includes(lastMove.sourcePath)) {
+                    window.fullDirectoryListing.push(lastMove.sourcePath);
+                }
+                filterFiles();
+                
+                // Find the file again after re-filtering
+                const newIndex = images.indexOf(lastMove.sourcePath);
+                if (newIndex !== -1) {
+                    currentIndex = newIndex;
+                }
+            }
+        }
+        
+        await updateMedia();
+    } catch (error) {
+        console.error('Error in handleSuccessfulUndo:', error);
+        // If something goes wrong, try to refresh the directory
+        await refreshDirectoryListing();
+    }
+}
+
+// Modified cleanupMissingFile function
+function cleanupMissingFile(filePath) {
+    // Remove from images array
+    const index = images.indexOf(filePath);
+    if (index > -1) {
+        images.splice(index, 1);
+    }
+    
+    // Remove from fullDirectoryListing
+    if (window.fullDirectoryListing) {
+        const dirIndex = window.fullDirectoryListing.indexOf(filePath);
+        if (dirIndex > -1) {
+            window.fullDirectoryListing.splice(dirIndex, 1);
+        }
+    }
+    
+    // Update counter
+    if (images.length === 0) {
+        counterElement.textContent = 'No media';
+        fileNameElement.textContent = '';
+    } else {
+        currentIndex = Math.min(currentIndex, images.length - 1);
+    }
+}
+
+// Add this new function to refresh directory contents
+async function refreshDirectoryListing() {
+    if (!currentDirectory || isRefreshInProgress) return;
+    
+    isRefreshInProgress = true;
+    try {
+        // Re-scan directory with current subfolder preference
+        window.fullDirectoryListing = await scanDirectory(currentDirectory, includeSubfolders, subfolderDepth);
+        
+        // Re-filter files
+        const enabledFormats = getEnabledFormats();
+        const formatRegex = new RegExp(`\\.(${enabledFormats.join('|')})$`, 'i');
+        const newImages = window.fullDirectoryListing.filter(file => formatRegex.test(file));
+        
+        // Update images array while preserving current index position if possible
+        const currentFile = images[currentIndex];
+        images = newImages;
+        
+        if (currentFile) {
+            const newIndex = images.indexOf(currentFile);
+            if (newIndex !== -1) {
+                currentIndex = newIndex;
+            } else {
+                currentIndex = Math.min(currentIndex, Math.max(0, images.length - 1));
+            }
+        }
+    } catch (error) {
+        console.error('Error refreshing directory:', error);
+    } finally {
+        isRefreshInProgress = false;
+    }
+}

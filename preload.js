@@ -7,6 +7,10 @@ contextBridge.exposeInMainWorld('electronAPI', {
     setFullscreen: (flag) => ipcRenderer.invoke('set-fullscreen', flag),
     openDirectory: (path) => ipcRenderer.invoke('open-directory', path),
     getFileMetadata: (path) => ipcRenderer.invoke('get-file-metadata', path),
-    getDirectoryContents: (dirPath, includeSubfolders) => 
-        ipcRenderer.invoke('getDirectoryContents', dirPath, includeSubfolders),
+    getDirectoryContents: (dirPath, includeSubfolders, depth) => 
+        ipcRenderer.invoke('getDirectoryContents', dirPath, includeSubfolders, depth),
+    selectMoveDirectory: () => ipcRenderer.invoke('select-move-directory'),
+    moveFile: (sourcePath, destinationDir) => ipcRenderer.invoke('move-file', sourcePath, destinationDir),
+    getParentDirectory: (filePath) => ipcRenderer.invoke('getParentDirectory', filePath),
+    fileExists: (filePath) => ipcRenderer.invoke('fileExists', filePath),
 }); 

@@ -3,6 +3,37 @@
   <head>
     <title>Media Deletion Helper</title>
     <style>
+      /* Add this at the start of your style section */
+      :root[data-theme="dark"] {
+        --bg-color: #1a1a1a;
+        --text-color: #ffffff;
+        --button-bg: #2c2c2c;
+        --button-hover: #3c3c3c;
+        --secondary-bg: #252525;
+        --hover-bg: #303030;
+        --border-color: #404040;
+      }
+
+      :root[data-theme="light"] {
+        --bg-color: #ffffff;
+        --text-color: #000000;
+        --button-bg: #e0e0e0;
+        --button-hover: #d0d0d0;
+        --secondary-bg: #f5f5f5;
+        --hover-bg: #ebebeb;
+        --border-color: #cccccc;
+      }
+
+      :root[data-theme="pink"] {
+        --bg-color: #2b1f2b;
+        --text-color: #ffffff;
+        --button-bg: #ff69b4;
+        --button-hover: #ff8cc6;
+        --secondary-bg: #3d2b3d;
+        --hover-bg: #4a334a;
+        --border-color: #ff69b4;
+      }
+
       body {
         margin: 0;
         padding: 20px;
@@ -555,6 +586,182 @@
         border: 1px solid transparent;
         transition: all 0.2s ease;
       }
+
+      .filter-group move-settings {
+        height: 100%;
+        display: flex;
+        flex-direction: column;
+      }
+
+      .filter-group move-settings h3 {
+        font-size: 1.2em;
+        font-weight: bold;
+        color: #fff;
+        margin: 0;
+        padding-bottom: 10px;
+        border-bottom: 1px solid rgba(255, 255, 255, 0.2);
+        margin-bottom: 15px;
+      }
+
+      .filter-group move-settings .setting-row {
+        margin: 5px 0;
+      }
+
+      .filter-group move-settings input[type="checkbox"] {
+        cursor: pointer;
+      }
+
+      .filter-group move-settings input[type="checkbox"]:disabled + span {
+        opacity: 0.5;
+        cursor: not-allowed;
+      }
+
+      .filter-group move-settings input[type="checkbox"]:disabled {
+        cursor: not-allowed;
+      }
+
+      .quick-move-settings {
+        display: flex;
+        flex-direction: column;
+        gap: 10px;
+        margin-top: 10px;
+      }
+
+      .quick-move-settings button {
+        padding: 8px 12px;
+        background: var(--button-bg);
+        border: none;
+        color: white;
+        border-radius: 6px;
+        cursor: pointer;
+        white-space: nowrap;
+        font-size: 14px;
+        transition: all 0.2s ease;
+        border: 1px solid transparent;
+      }
+
+      .quick-move-settings button:hover {
+        background: var(--button-hover);
+        transform: translateY(-1px);
+      }
+
+      .quick-move-folders {
+        display: flex;
+        flex-direction: column;
+        gap: 10px;
+      }
+
+      .quick-move-folder {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        background: var(--secondary-bg);
+        padding: 10px;
+        border-radius: 8px;
+        border: 1px solid var(--border-color);
+      }
+
+      .quick-move-folder .setting-row {
+        margin: 5px 0;
+      }
+
+      .quick-move-folder .setting-row input[type="text"] {
+        width: 100%;
+        padding: 4px;
+        background: #333;
+        border: 1px solid #555;
+        color: white;
+        border-radius: 4px;
+      }
+
+      .quick-move-folder .setting-row select {
+        padding: 4px;
+        background: #333;
+        border: 1px solid #555;
+        color: white;
+        border-radius: 4px;
+        cursor: pointer;
+      }
+
+      .quick-move-folder .setting-row select:hover {
+        background: #444;
+      }
+
+      .quick-move-folder .setting-row input[type="checkbox"] {
+        cursor: pointer;
+      }
+
+      .quick-move-folder .setting-row input[type="checkbox"]:disabled + span {
+        opacity: 0.5;
+        cursor: not-allowed;
+      }
+
+      .quick-move-folder .setting-row input[type="checkbox"]:disabled {
+        cursor: not-allowed;
+      }
+
+      .quick-move-panel {
+        position: fixed;
+        right: 20px;
+        top: 50%;
+        transform: translateY(-50%);
+        background: var(--secondary-bg);
+        padding: 15px;
+        border-radius: 8px;
+        border: 1px solid var(--border-color);
+        max-width: 300px;
+      }
+
+      .quick-folder-item {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        padding: 8px;
+        margin-bottom: 8px;
+        background: var(--button-bg);
+        border-radius: 4px;
+        transition: all 0.2s ease;
+      }
+
+      .quick-folder-item .quick-folder-path {
+        flex: 1;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+        cursor: pointer;
+      }
+
+      .quick-folder-item .quick-folder-path:hover {
+        opacity: 0.8;
+      }
+
+      .quick-folder-remove {
+        opacity: 0.6;
+        cursor: pointer;
+        padding: 4px 8px;
+        border-radius: 4px;
+      }
+
+      .quick-folder-remove:hover {
+        opacity: 1;
+        background: rgba(255, 0, 0, 0.2);
+      }
+
+      .quick-folder-item.empty {
+        opacity: 0.5;
+        border: 1px dashed var(--border-color);
+        background: transparent;
+      }
+
+      .quick-folder-item.empty:hover {
+        opacity: 0.8;
+        background: var(--button-bg);
+      }
+
+      .quick-folder-item.empty .quick-folder-path {
+        font-style: italic;
+        color: var(--text-color);
+      }
     </style>
   </head>
   <body>
@@ -696,6 +903,22 @@
               <input type="checkbox" id="include-subfolders" />
               Include Subfolders
             </label>
+            <input
+              type="number"
+              id="subfolder-depth"
+              min="0"
+              value="0"
+              step="1"
+              title="0 = unlimited depth"
+              style="width: 60px; margin-left: 10px;"
+            />
+            <span title="0 = unlimited depth">depth</span>
+          </div>
+          <div class="setting-row">
+            <label>
+              <input type="checkbox" id="enable-quick-move" />
+              Show Quick Move Panel
+            </label>
           </div>
         </div>
         <div class="filter-group theme-settings">
@@ -725,9 +948,11 @@
       <img id="current-media" />
       <video id="current-video" controls></video>
     </div>
+    <div id="quick-move-panel" class="quick-move-panel" style="display: none;">
+      <div class="quick-move-folders"></div>
+    </div>
     <div class="instructions">
-      ← → Arrow keys to navigate • ↑ Arrow key to delete • ↓ Arrow key to undo
-      delete
+      ← → Arrow keys to navigate • ↑ Arrow key to delete • ↓ or Ctrl+Z to undo • m to move file
     </div>
     <div class="top-controls">
       <button id="toggle-settings" class="settings-btn">
