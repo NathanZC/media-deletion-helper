@@ -263,22 +263,17 @@
       }
 
       .fullscreen-btn {
-        position: fixed;
-        right: 20px;
-        top: 20px;
+        padding: 8px 12px;
         background: var(--button-bg);
         border: none;
-        color: white;
-        padding: 12px 20px;
-        border-radius: 8px;
+        color: var(--text-color);
+        border-radius: 6px;
         cursor: pointer;
-        z-index: 1000;
         font-size: 14px;
+        transition: all 0.2s ease;
         display: flex;
         align-items: center;
-        gap: 8px;
-        border: 1px solid transparent;
-        transition: all 0.2s ease;
+        justify-content: center;
       }
 
       .fullscreen-btn:hover {
@@ -287,7 +282,8 @@
       }
 
       .fullscreen-icon {
-        font-size: 16px;
+        font-size: 18px;
+        line-height: 1;
       }
 
       body.fullscreen-mode {
@@ -710,6 +706,14 @@
         border-radius: 8px;
         border: 1px solid var(--border-color);
         max-width: 300px;
+        visibility: hidden;
+        opacity: 0;
+        transition: visibility 0s, opacity 0.3s ease;
+      }
+
+      .quick-move-panel.visible {
+        visibility: visible;
+        opacity: 1;
       }
 
       .quick-folder-item {
@@ -830,20 +834,36 @@
 
       .tab-buttons {
         display: flex;
+        flex-wrap: wrap;
         gap: 5px;
         margin-bottom: 15px;
         border-bottom: 1px solid var(--border-color);
         padding-bottom: 10px;
+        max-width: 100%;
+      }
+
+      .tab-group {
+        display: flex;
+        flex: 0 1 auto;
+        min-width: min-content;
       }
 
       .tab-button {
-        padding: 8px 16px;
+        white-space: nowrap;
+        width: 100%;
+        padding: 8px 12px;
         background: var(--button-bg);
         border: none;
-        color: var(--text-color);
-        border-radius: 4px;
+        color: white;
+        border-radius: 6px;
         cursor: pointer;
+        font-size: 14px;
         transition: all 0.2s ease;
+      }
+
+      .tab-button:hover {
+        background: var(--button-hover);
+        transform: translateY(-1px);
       }
 
       .tab-button.active {
@@ -851,13 +871,20 @@
       }
 
       .add-tab-button {
+        margin-top: 5px;
         padding: 8px 12px;
         background: var(--button-bg);
         border: none;
-        color: var(--text-color);
-        border-radius: 4px;
+        color: white;
+        border-radius: 6px;
         cursor: pointer;
+        font-size: 14px;
         transition: all 0.2s ease;
+      }
+
+      .add-tab-button:hover {
+        background: var(--button-hover);
+        transform: translateY(-1px);
       }
 
       .tab-panels {
@@ -893,6 +920,30 @@
         align-items: center;
         padding: 8px 12px;
       }
+
+      .tab-delete-btn {
+        margin-left: 8px;
+        opacity: 0.6;
+        cursor: pointer;
+        font-size: 16px;
+        padding: 0 4px;
+        border-radius: 4px;
+        transition: all 0.2s ease;
+      }
+
+      .tab-delete-btn:hover {
+        opacity: 1;
+        background: rgba(255, 0, 0, 0.2);
+      }
+
+      .top-controls {
+        position: fixed;
+        top: 20px;
+        right: 20px;
+        display: flex;
+        gap: 10px;
+        z-index: 1000;
+      }
     </style>
   </head>
   <body>
@@ -909,10 +960,6 @@
             📂 Open
           </button>
         </div>
-        <button id="fullscreen-btn" class="fullscreen-btn">
-          <span class="fullscreen-icon">⛶</span>
-          Fullscreen
-        </button>
       </div>
     </div>
     <div class="settings-container">
@@ -1095,10 +1142,6 @@
       ← → Arrow keys to navigate • ↑ Arrow key to delete • ↓ or Ctrl+Z to undo • m to move file
     </div>
     <div class="top-controls">
-      <button id="toggle-settings" class="settings-btn">
-        ⚙️ Settings
-        <span class="toggle-icon">▼</span>
-      </button>
       <button id="fullscreen-btn" class="fullscreen-btn">
         <span class="fullscreen-icon">⛶</span>
       </button>
@@ -1108,16 +1151,19 @@
         <div class="tab-group">
           <button class="tab-button active" data-tab="group1">
             <span class="tab-name" contenteditable="true">Group 1</span>
+            <button class="tab-delete-btn">x</button>
           </button>
         </div>
         <div class="tab-group">
           <button class="tab-button" data-tab="group2">
             <span class="tab-name" contenteditable="true">Group 2</span>
+            <button class="tab-delete-btn">x</button>
           </button>
         </div>
         <div class="tab-group">
           <button class="tab-button" data-tab="group3">
             <span class="tab-name" contenteditable="true">Group 3</span>
+            <button class="tab-delete-btn">x</button>
           </button>
         </div>
         <button class="add-tab-button">+</button>

@@ -967,29 +967,102 @@ openFileBtn.addEventListener('click', async () => {
     }
 });
 
-// Add event listener for ESC key
-document.addEventListener('keydown', (e) => {
-    if (e.key === 'Escape' && isFullscreen) {
-        document.body.classList.remove('fullscreen-mode');
-        window.electronAPI.setFullscreen(false);
-        isFullscreen = false;
-    }
-});
 // Initialize media display
 updateMedia();
 
 function initializeQuickSortTabs() {
     // Load saved groups and names from localStorage
     quickSortGroups = JSON.parse(localStorage.getItem('quickSortGroups') || '{"group1": [], "group2": [], "group3": []}');
+    console.log("quickSortGroups: " + JSON.stringify(quickSortGroups));
     tabNames = JSON.parse(localStorage.getItem('tabNames') || '{"group1": "Group 1", "group2": "Group 2", "group3": "Group 3"}');
-    
+    console.log(localStorage.getItem('tabNames'));
     const tabsContainer = document.getElementById('quick-sort-tabs');
     const tabButtons = document.querySelectorAll('.tab-button:not(.add-tab-button)');
     const addTabButton = document.querySelector('.add-tab-button');
-    
+    const tabButtonsContainer = document.querySelector('.tab-buttons');
+    const tabPanelsContainer = document.querySelector('.tab-panels');
     // Show/hide tabs container based on quickmove panel setting
     tabsContainer.style.display = showQuickMovePanel ? 'block' : 'none';
-    
+        // Clear existing tabs (except add button)
+        while (tabButtonsContainer.firstChild) {
+            if (tabButtonsContainer.firstChild === addTabButton) break;
+            tabButtonsContainer.removeChild(tabButtonsContainer.firstChild);
+        }
+        tabPanelsContainer.innerHTML = '';
+        
+        // Create tabs for each group in localStorage
+        Object.keys(quickSortGroups).forEach(groupId => {
+            // Create tab button
+            const newTabButton = document.createElement('div');
+            newTabButton.className = 'tab-group';
+            newTabButton.innerHTML = `
+                <button class="tab-button" data-tab="${groupId}">
+                    <span class="tab-name" contenteditable="true">${tabNames[groupId]}</span>
+                    <span class="tab-delete-btn">×</span>
+                </button>
+            `;
+            
+            // Create tab panel
+            const newPanel = document.createElement('div');
+            newPanel.className = 'tab-panel';
+            newPanel.dataset.tab = groupId;
+            newPanel.innerHTML = `<div class="quick-move-folders"></div>`;
+            
+            // Add elements to DOM
+            tabButtonsContainer.insertBefore(newTabButton, addTabButton);
+            tabPanelsContainer.appendChild(newPanel);
+            
+            // Add name editing functionality
+            const nameSpan = newTabButton.querySelector('.tab-name');
+            nameSpan.addEventListener('blur', () => {
+                console.log("changing tab name");
+                const newName = nameSpan.textContent.trim();
+                if (newName) {
+                    console.log("new name: " + newName);
+                    tabNames[groupId] = newName;
+                    localStorage.setItem('tabNames', JSON.stringify(tabNames));
+                } else {
+                    nameSpan.textContent = tabNames[groupId];
+                }
+            });
+            
+            // Prevent tab switching when editing name
+            nameSpan.addEventListener('click', (e) => {
+                e.stopPropagation();
+            });
+            
+            // Setup tab switching
+            setupTabButton(newTabButton.querySelector('.tab-button'));
+
+            // Add delete functionality
+            const deleteBtn = newTabButton.querySelector('.tab-delete-btn');
+            deleteBtn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                if (Object.keys(quickSortGroups).length <= 1) {
+                    return; // Don't delete if it's the last tab
+                }
+                
+                // Remove from data structures
+                delete quickSortGroups[groupId];
+                delete tabNames[groupId];
+                
+                // Update localStorage
+                localStorage.setItem('quickSortGroups', JSON.stringify(quickSortGroups));
+                localStorage.setItem('tabNames', JSON.stringify(tabNames));
+                
+                // Remove DOM elements
+                newTabButton.remove();
+                document.querySelector(`.tab-panel[data-tab="${groupId}"]`).remove();
+                
+                // If we deleted the active tab, activate the first remaining tab
+                if (currentQuickSortGroup === groupId) {
+                    const firstTab = document.querySelector('.tab-button');
+                    if (firstTab) {
+                        firstTab.click();
+                    }
+                }
+            });
+        });
     // Initialize tab names
     tabButtons.forEach(button => {
         const tabId = button.dataset.tab;
@@ -998,9 +1071,13 @@ function initializeQuickSortTabs() {
         
         // Add event listener for name editing
         nameSpan.addEventListener('blur', () => {
+            console.log("changing tab name");
             const newName = nameSpan.textContent.trim();
             if (newName) {
+                console.log("new name: " + newName);
                 tabNames[tabId] = newName;
+                console.log("settuing tab names: " + tabNames.JSON, tabId);
+                console.log("settuing tab names: " + tabNames);
                 localStorage.setItem('tabNames', JSON.stringify(tabNames));
             } else {
                 nameSpan.textContent = tabNames[tabId];
@@ -1047,6 +1124,7 @@ function initializeQuickSortTabs() {
         newTabButton.innerHTML = `
             <button class="tab-button" data-tab="${newGroupId}">
                 <span class="tab-name" contenteditable="true">Group ${newGroupNumber}</span>
+                <span class="tab-delete-btn">×</span>
             </button>
         `;
         
@@ -1073,26 +1151,56 @@ function initializeQuickSortTabs() {
         // Add name editing functionality to new tab
         const nameSpan = newTabButton.querySelector('.tab-name');
         nameSpan.addEventListener('blur', () => {
+            console.log("changing new tab name");
             const newName = nameSpan.textContent.trim();
             if (newName) {
+                console.log("new tab new name: " + newName);
                 tabNames[newGroupId] = newName;
+                console.log("setting tab names:", JSON.stringify(tabNames), newGroupId);
                 localStorage.setItem('tabNames', JSON.stringify(tabNames));
+                console.log("local storage tab names: " + localStorage.getItem('tabNames'));
             } else {
                 nameSpan.textContent = tabNames[newGroupId];
             }
-        });
-        
+        });console.log("Current tabNames:", tabNames);
+        console.log("newGroupId:", newGroupId);
+        console.log("Current saved name:", tabNames[newGroupId]);
+        nameSpan.textContent = tabNames[newGroupId] || `Group ${newGroupId.replace('group', '')}`;
         // Prevent tab switching when editing name
         nameSpan.addEventListener('click', (e) => {
             e.stopPropagation();
         });
 
-        // Initialize the new group name
-        tabNames[newGroupId] = `Group ${newGroupNumber}`;
-        localStorage.setItem('tabNames', JSON.stringify(tabNames));
-
-        // Activate the new tab
         newTabButton.querySelector('.tab-button').click();
+
+        // Add delete functionality
+        const deleteBtn = newTabButton.querySelector('.tab-delete-btn');
+        deleteBtn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            if (Object.keys(quickSortGroups).length <= 1) {
+                return; // Don't delete if it's the last tab
+            }
+            
+            // Remove from data structures
+            delete quickSortGroups[newGroupId];
+            delete tabNames[newGroupId];
+            
+            // Update localStorage
+            localStorage.setItem('quickSortGroups', JSON.stringify(quickSortGroups));
+            localStorage.setItem('tabNames', JSON.stringify(tabNames));
+            
+            // Remove DOM elements
+            newTabButton.remove();
+            document.querySelector(`.tab-panel[data-tab="${newGroupId}"]`).remove();
+            
+            // If we deleted the active tab, activate the first remaining tab
+            if (currentQuickSortGroup === newGroupId) {
+                const firstTab = document.querySelector('.tab-button');
+                if (firstTab) {
+                    firstTab.click();
+                }
+            }
+        });
     });
 }
 
@@ -1128,3 +1236,12 @@ function updateQuickMoveFoldersUI() {
 
 // Add to your existing initialization calls
 initializeQuickSortTabs();
+
+// Add event listener for ESC key
+document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape' && isFullscreen) {
+        document.body.classList.remove('fullscreen-mode');
+        window.electronAPI.setFullscreen(false);
+        isFullscreen = false;
+    }
+});
