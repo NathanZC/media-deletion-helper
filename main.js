@@ -265,3 +265,13 @@ ipcMain.handle('fileExists', async (event, filePath) => {
         return false;
     }
 });
+
+ipcMain.handle('open-file-location', async (event, filePath) => {
+    try {
+        await shell.showItemInFolder(filePath);
+        return true;
+    } catch (error) {
+        console.error('Error opening file location:', error);
+        return false;
+    }
+});

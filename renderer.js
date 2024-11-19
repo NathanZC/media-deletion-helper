@@ -39,6 +39,7 @@ let isFullscreen = false;
 let currentDirectory = null;
 const currentDirPath = document.getElementById('current-dir-path');
 const openDirBtn = document.getElementById('open-dir-btn');
+const openFileBtn = document.getElementById('open-file-btn');
 
 function isVideo(filePath) {
     return /\.(mp4|webm|mov)$/i.test(filePath);
@@ -135,6 +136,7 @@ async function updateMedia() {
             videoElement.style.display = 'none';
             counterElement.textContent = 'No media';
             fileNameElement.textContent = '';
+            openFileBtn.style.display = 'none';
             return;
         }
         
@@ -194,6 +196,7 @@ async function updateMedia() {
             }
             
             counterElement.textContent = `File ${currentIndex + 1} of ${images.length}`;
+            openFileBtn.style.display = images.length > 0 ? 'block' : 'none';
         } catch (error) {
             console.error('Error updating media:', error);
             // Remove the problematic file from our arrays
@@ -951,3 +954,9 @@ async function moveCurrentFile() {
         console.error('Error moving file:', error);
     }
 }
+
+openFileBtn.addEventListener('click', async () => {
+    if (images[currentIndex]) {
+        await window.electronAPI.openFileLocation(images[currentIndex]);
+    }
+});

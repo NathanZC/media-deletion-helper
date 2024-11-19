@@ -13,4 +13,5 @@ contextBridge.exposeInMainWorld('electronAPI', {
     moveFile: (sourcePath, destinationDir) => ipcRenderer.invoke('move-file', sourcePath, destinationDir),
     getParentDirectory: (filePath) => ipcRenderer.invoke('getParentDirectory', filePath),
     fileExists: (filePath) => ipcRenderer.invoke('fileExists', filePath),
+    openFileLocation: (path) => ipcRenderer.invoke('open-file-location', path),
 }); 

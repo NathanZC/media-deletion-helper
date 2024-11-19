@@ -762,6 +762,55 @@
         font-style: italic;
         color: var(--text-color);
       }
+
+      .file-info {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+      }
+
+      .open-file-btn {
+        padding: 4px 8px;
+        background: var(--button-bg);
+        border: none;
+        color: var(--text-color);
+        border-radius: 4px;
+        cursor: pointer;
+        font-size: 14px;
+        transition: all 0.2s ease;
+        opacity: 0.7;
+      }
+
+      .open-file-btn:hover {
+        opacity: 1;
+        background: var(--button-hover);
+      }
+
+      .media-info {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 10px;
+        margin-bottom: 15px;
+      }
+
+      .file-info {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 10px;
+        text-align: center;
+      }
+
+      #file-name {
+        margin: 0;
+        padding: 0;
+      }
+
+      #image-counter {
+        margin: 0;
+        padding: 0;
+      }
     </style>
   </head>
   <body>
@@ -942,7 +991,12 @@
     </div>
     <div class="media-info">
       <div id="image-counter"></div>
-      <div id="file-name"></div>
+      <div class="file-info">
+        <div id="file-name"></div>
+        <button id="open-file-btn" class="open-file-btn" style="display: none;" title="Open file location">
+          📂
+        </button>
+      </div>
     </div>
     <div id="image-container">
       <img id="current-media" />
