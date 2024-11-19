@@ -873,6 +873,26 @@
       .tab-panel.active {
         display: block;
       }
+
+      .tab-name {
+        outline: none;
+        padding: 2px 4px;
+        border-radius: 4px;
+      }
+
+      .tab-name:focus {
+        background: rgba(255, 255, 255, 0.1);
+      }
+
+      .tab-name:hover {
+        background: rgba(255, 255, 255, 0.05);
+      }
+
+      .tab-button {
+        display: flex;
+        align-items: center;
+        padding: 8px 12px;
+      }
     </style>
   </head>
   <body>
@@ -1081,9 +1101,21 @@
     </div>
     <div id="quick-sort-tabs" class="quick-sort-tabs">
       <div class="tab-buttons">
-        <button class="tab-button active" data-tab="group1">Group 1</button>
-        <button class="tab-button" data-tab="group2">Group 2</button>
-        <button class="tab-button" data-tab="group3">Group 3</button>
+        <div class="tab-group">
+          <button class="tab-button active" data-tab="group1">
+            <span class="tab-name" contenteditable="true">Group 1</span>
+          </button>
+        </div>
+        <div class="tab-group">
+          <button class="tab-button" data-tab="group2">
+            <span class="tab-name" contenteditable="true">Group 2</span>
+          </button>
+        </div>
+        <div class="tab-group">
+          <button class="tab-button" data-tab="group3">
+            <span class="tab-name" contenteditable="true">Group 3</span>
+          </button>
+        </div>
         <button class="add-tab-button">+</button>
       </div>
       <div class="tab-panels">

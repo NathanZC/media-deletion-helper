@@ -25,6 +25,7 @@ let isRefreshInProgress = false;
 let undoStack = [];
 let quickSortGroups = {};
 let currentQuickSortGroup = 'group1';
+let tabNames = {};
 
 const mediaElement = document.getElementById('current-media');
 const videoElement = document.getElementById('current-video');
@@ -970,38 +971,120 @@ openFileBtn.addEventListener('click', async () => {
 updateMedia();
 
 function initializeQuickSortTabs() {
-    // Load saved groups from localStorage
+    // Load saved groups and names from localStorage
     quickSortGroups = JSON.parse(localStorage.getItem('quickSortGroups') || '{"group1": [], "group2": [], "group3": []}');
+    tabNames = JSON.parse(localStorage.getItem('tabNames') || '{"group1": "Group 1", "group2": "Group 2", "group3": "Group 3"}');
     
     const tabsContainer = document.getElementById('quick-sort-tabs');
-    const tabButtons = document.querySelectorAll('.tab-button');
+    const tabButtons = document.querySelectorAll('.tab-button:not(.add-tab-button)');
+    const addTabButton = document.querySelector('.add-tab-button');
     
     // Show/hide tabs container based on quickmove panel setting
     tabsContainer.style.display = showQuickMovePanel ? 'block' : 'none';
     
+    // Initialize tab names
+    tabButtons.forEach(button => {
+        const tabId = button.dataset.tab;
+        const nameSpan = button.querySelector('.tab-name');
+        nameSpan.textContent = tabNames[tabId] || `Group ${tabId.replace('group', '')}`;
+        
+        // Add event listener for name editing
+        nameSpan.addEventListener('blur', () => {
+            const newName = nameSpan.textContent.trim();
+            if (newName) {
+                tabNames[tabId] = newName;
+                localStorage.setItem('tabNames', JSON.stringify(tabNames));
+            } else {
+                nameSpan.textContent = tabNames[tabId];
+            }
+        });
+        
+        // Prevent tab switching when editing name
+        nameSpan.addEventListener('click', (e) => {
+            e.stopPropagation();
+        });
+    });
+
     // Initialize the first group as active
     currentQuickSortGroup = 'group1';
     document.querySelector('.tab-panel[data-tab="group1"]').classList.add('active');
     updateQuickMoveFoldersUI();
     
     // Add tab switching functionality
-    tabButtons.forEach(button => {
-        if (button.classList.contains('add-tab-button')) return;
-        
+    function setupTabButton(button) {
         button.addEventListener('click', () => {
-            // Remove active class from all buttons and panels
             document.querySelectorAll('.tab-button').forEach(btn => btn.classList.remove('active'));
             document.querySelectorAll('.tab-panel').forEach(panel => panel.classList.remove('active'));
             
-            // Add active class to clicked button and corresponding panel
             button.classList.add('active');
             const tabName = button.dataset.tab;
             document.querySelector(`.tab-panel[data-tab="${tabName}"]`).classList.add('active');
             currentQuickSortGroup = tabName;
             
-            // Update UI for current group
             updateQuickMoveFoldersUI();
         });
+    }
+
+    tabButtons.forEach(setupTabButton);
+
+    // Add new tab functionality
+    addTabButton.addEventListener('click', () => {
+        const existingTabs = document.querySelectorAll('.tab-button:not(.add-tab-button)');
+        const newGroupNumber = existingTabs.length + 1;
+        const newGroupId = `group${newGroupNumber}`;
+        
+        // Create new tab button with editable name
+        const newTabButton = document.createElement('div');
+        newTabButton.className = 'tab-group';
+        newTabButton.innerHTML = `
+            <button class="tab-button" data-tab="${newGroupId}">
+                <span class="tab-name" contenteditable="true">Group ${newGroupNumber}</span>
+            </button>
+        `;
+        
+        // Create new tab panel with just the folders div
+        const newPanel = document.createElement('div');
+        newPanel.className = 'tab-panel';
+        newPanel.dataset.tab = newGroupId;
+        newPanel.innerHTML = `<div class="quick-move-folders"></div>`;
+
+        // Insert new elements
+        const tabButtons = document.querySelector('.tab-buttons');
+        tabButtons.insertBefore(newTabButton, addTabButton);
+        document.querySelector('.tab-panels').appendChild(newPanel);
+
+        // Initialize the new group in quickSortGroups if it doesn't exist
+        if (!quickSortGroups[newGroupId]) {
+            quickSortGroups[newGroupId] = [];
+            localStorage.setItem('quickSortGroups', JSON.stringify(quickSortGroups));
+        }
+
+        // Setup event listener for the new tab
+        setupTabButton(newTabButton.querySelector('.tab-button'));
+
+        // Add name editing functionality to new tab
+        const nameSpan = newTabButton.querySelector('.tab-name');
+        nameSpan.addEventListener('blur', () => {
+            const newName = nameSpan.textContent.trim();
+            if (newName) {
+                tabNames[newGroupId] = newName;
+                localStorage.setItem('tabNames', JSON.stringify(tabNames));
+            } else {
+                nameSpan.textContent = tabNames[newGroupId];
+            }
+        });
+        
+        // Prevent tab switching when editing name
+        nameSpan.addEventListener('click', (e) => {
+            e.stopPropagation();
+        });
+
+        // Initialize the new group name
+        tabNames[newGroupId] = `Group ${newGroupNumber}`;
+        localStorage.setItem('tabNames', JSON.stringify(tabNames));
+
+        // Activate the new tab
+        newTabButton.querySelector('.tab-button').click();
     });
 }
 
