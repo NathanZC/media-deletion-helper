@@ -706,17 +706,26 @@ function updateQuickMoveFoldersUI() {
     const currentPanel = document.querySelector(`.tab-panel[data-tab="${currentQuickSortGroup}"]`);
     const panelFolders = currentPanel.querySelector('.quick-move-folders');
     
-    let html = '';
+    let leftColumnHtml = '';
+    let rightColumnHtml = '';
     const slotsToShow = Math.min(currentFolders.length + 1, 19);
     const letterKeys = 'QWERTYUIOP';
     
     for (let i = 0; i < slotsToShow; i++) {
+        const isRightColumn = i >= 9;
+        let html = '';
+        
         if (i < currentFolders.length) {
+            const fullPath = currentFolders[i];
+            const folderName = fullPath.split(/[\\/]/).pop();
             const keyLabel = i < 9 ? (i + 1) : letterKeys[i - 9];
             html += `
                 <div class="quick-folder-item">
                     <span class="quick-folder-key">${keyLabel}</span>
-                    <span class="quick-folder-path" onclick="moveToQuickFolder('${currentFolders[i].replace(/\\/g, '\\\\')}')">${currentFolders[i]}</span>
+                    <span class="quick-folder-path" 
+                          onclick="moveToQuickFolder('${fullPath.replace(/\\/g, '\\\\')}')"
+                          ondblclick="window.electronAPI.openDirectory('${fullPath.replace(/\\/g, '\\\\')}')"
+                          title="${fullPath}">${folderName}</span>
                     <span class="quick-folder-remove" onclick="removeQuickMoveFolder(${i})">×</span>
                 </div>
             `;
@@ -729,9 +738,27 @@ function updateQuickMoveFoldersUI() {
                 </div>
             `;
         }
+        
+        if (isRightColumn) {
+            rightColumnHtml += html;
+        } else {
+            leftColumnHtml += html;
+        }
     }
     
-    panelFolders.innerHTML = html;
+    // Create the two-column layout
+    panelFolders.innerHTML = `
+        <div class="quick-move-folders-container">
+            <div class="quick-move-column">
+                ${leftColumnHtml}
+            </div>
+            ${rightColumnHtml ? `
+                <div class="quick-move-column">
+                    ${rightColumnHtml}
+                </div>
+            ` : ''}
+        </div>
+    `;
 }
 
 // Add to your existing initialization calls
@@ -1225,17 +1252,26 @@ function updateQuickMoveFoldersUI() {
     const currentPanel = document.querySelector(`.tab-panel[data-tab="${currentQuickSortGroup}"]`);
     const panelFolders = currentPanel.querySelector('.quick-move-folders');
     
-    let html = '';
+    let leftColumnHtml = '';
+    let rightColumnHtml = '';
     const slotsToShow = Math.min(currentFolders.length + 1, 19);
     const letterKeys = 'QWERTYUIOP';
     
     for (let i = 0; i < slotsToShow; i++) {
+        const isRightColumn = i >= 9;
+        let html = '';
+        
         if (i < currentFolders.length) {
+            const fullPath = currentFolders[i];
+            const folderName = fullPath.split(/[\\/]/).pop();
             const keyLabel = i < 9 ? (i + 1) : letterKeys[i - 9];
             html += `
                 <div class="quick-folder-item">
                     <span class="quick-folder-key">${keyLabel}</span>
-                    <span class="quick-folder-path" onclick="moveToQuickFolder('${currentFolders[i].replace(/\\/g, '\\\\')}')">${currentFolders[i]}</span>
+                    <span class="quick-folder-path" 
+                          onclick="moveToQuickFolder('${fullPath.replace(/\\/g, '\\\\')}')"
+                          ondblclick="window.electronAPI.openDirectory('${fullPath.replace(/\\/g, '\\\\')}')"
+                          title="${fullPath}">${folderName}</span>
                     <span class="quick-folder-remove" onclick="removeQuickMoveFolder(${i})">×</span>
                 </div>
             `;
@@ -1248,9 +1284,27 @@ function updateQuickMoveFoldersUI() {
                 </div>
             `;
         }
+        
+        if (isRightColumn) {
+            rightColumnHtml += html;
+        } else {
+            leftColumnHtml += html;
+        }
     }
     
-    panelFolders.innerHTML = html;
+    // Create the two-column layout
+    panelFolders.innerHTML = `
+        <div class="quick-move-folders-container">
+            <div class="quick-move-column">
+                ${leftColumnHtml}
+            </div>
+            ${rightColumnHtml ? `
+                <div class="quick-move-column">
+                    ${rightColumnHtml}
+                </div>
+            ` : ''}
+        </div>
+    `;
 }
 
 // Add to your existing initialization calls
@@ -1263,4 +1317,147 @@ document.addEventListener('keydown', (e) => {
         window.electronAPI.setFullscreen(false);
         isFullscreen = false;
     }
+});
+
+function initializeDragAndResize() {
+    const container = document.querySelector('.quick-sort-tabs');
+    let isDragging = false;
+    let currentX;
+    let currentY;
+    let initialX;
+    let initialY;
+
+    // Save the position to localStorage
+    function savePosition() {
+        const position = {
+            right: container.style.right,
+            top: container.style.top,
+            width: container.style.width,
+            height: container.style.height
+        };
+        localStorage.setItem('quickSortPosition', JSON.stringify(position));
+    }
+
+    // Load the position from localStorage
+    function loadPosition() {
+        const savedPosition = localStorage.getItem('quickSortPosition');
+        if (savedPosition) {
+            const position = JSON.parse(savedPosition);
+            container.style.right = position.right;
+            container.style.top = position.top;
+            container.style.width = position.width;
+            container.style.height = position.height;
+        }
+    }
+
+    function dragStart(e) {
+        // Only start dragging if clicking the header area (first 40px from top)
+        const rect = container.getBoundingClientRect();
+        const clickY = e.clientY - rect.top;
+        
+        if (clickY > 40) return; // Only allow dragging from the header area
+
+        isDragging = true;
+        container.classList.add('dragging');
+        
+        initialX = e.clientX - container.offsetLeft;
+        initialY = e.clientY - container.offsetTop;
+    }
+
+    function dragEnd() {
+        isDragging = false;
+        container.classList.remove('dragging');
+        savePosition();
+    }
+
+    function drag(e) {
+        if (isDragging) {
+            e.preventDefault();
+            
+            currentX = e.clientX - initialX;
+            currentY = e.clientY - initialY;
+
+            // Convert position to right-based positioning
+            const windowWidth = window.innerWidth;
+            const windowHeight = window.innerHeight;
+            const containerWidth = container.offsetWidth;
+            const containerHeight = container.offsetHeight;
+
+            const right = windowWidth - (currentX + containerWidth);
+            const top = currentY;
+
+            // Ensure the container doesn't go out of bounds
+            const maxRight = windowWidth - containerWidth;
+            const maxTop = windowHeight - containerHeight;
+
+            if (right < 0) {
+                container.style.right = 0;
+            } else if (right > maxRight) {
+                container.style.right = maxRight;
+            } else {
+                container.style.right = right;
+            }
+
+            if (top < 0) {
+                container.style.top = 0;
+            } else if (top > maxTop) {
+                container.style.top = maxTop;
+            } else {
+                container.style.top = top;
+            }
+        }
+    }
+
+    // Add event listeners
+    container.addEventListener('mousedown', dragStart);
+    container.addEventListener('mousemove', drag);
+    container.addEventListener('mouseup', dragEnd);
+}
+
+// Add to your existing initialization calls
+initializeDragAndResize();
+
+function initializeCustomResize() {
+    const container = document.querySelector('.quick-sort-tabs');
+    let isResizing = false;
+    let initialWidth, initialHeight, initialX, initialY;
+
+    container.addEventListener('mousedown', (e) => {
+        // Check if click is in the bottom-left 15x15px area
+        const rect = container.getBoundingClientRect();
+        const isInResizeZone = 
+            e.clientX <= rect.left + 15 && 
+            e.clientY >= rect.bottom - 15;
+
+        if (isInResizeZone) {
+            isResizing = true;
+            initialWidth = container.offsetWidth;
+            initialHeight = container.offsetHeight;
+            initialX = e.clientX;
+            initialY = e.clientY;
+            e.preventDefault();
+        }
+    });
+
+    document.addEventListener('mousemove', (e) => {
+        if (!isResizing) return;
+
+        const deltaX = initialX - e.clientX;
+        const deltaY = e.clientY - initialY;
+
+        const newWidth = Math.max(150, initialWidth + deltaX);  // Min width 150px
+        const newHeight = Math.max(100, initialHeight + deltaY); // Min height 100px
+
+        container.style.width = `${newWidth}px`;
+        container.style.height = `${newHeight}px`;
+    });
+
+    document.addEventListener('mouseup', () => {
+        isResizing = false;
+    });
+}
+
+// Call this function when the quick sort panel is initialized
+document.addEventListener('DOMContentLoaded', () => {
+    initializeCustomResize();
 });

@@ -642,129 +642,55 @@
       }
 
       .quick-move-folders {
-        display: flex;
-        flex-direction: column;
+        display: grid;
+        grid-template-columns: repeat(auto-fit, 130px);
         gap: 10px;
-      }
-
-      .quick-move-folder {
-        display: flex;
-        align-items: center;
-        gap: 10px;
-        background: var(--secondary-bg);
-        padding: 10px;
-        border-radius: 8px;
-        border: 1px solid var(--border-color);
-      }
-
-      .quick-move-folder .setting-row {
-        margin: 5px 0;
-      }
-
-      .quick-move-folder .setting-row input[type="text"] {
         width: 100%;
-        padding: 4px;
-        background: #333;
-        border: 1px solid #555;
-        color: white;
-        border-radius: 4px;
-      }
-
-      .quick-move-folder .setting-row select {
-        padding: 4px;
-        background: #333;
-        border: 1px solid #555;
-        color: white;
-        border-radius: 4px;
-        cursor: pointer;
-      }
-
-      .quick-move-folder .setting-row select:hover {
-        background: #444;
-      }
-
-      .quick-move-folder .setting-row input[type="checkbox"] {
-        cursor: pointer;
-      }
-
-      .quick-move-folder .setting-row input[type="checkbox"]:disabled + span {
-        opacity: 0.5;
-        cursor: not-allowed;
-      }
-
-      .quick-move-folder .setting-row input[type="checkbox"]:disabled {
-        cursor: not-allowed;
-      }
-
-      .quick-move-panel {
-        position: fixed;
-        right: 20px;
-        top: 50%;
-        transform: translateY(-50%);
-        background: var(--secondary-bg);
-        padding: 15px;
-        border-radius: 8px;
-        border: 1px solid var(--border-color);
-        max-width: 300px;
-        visibility: hidden;
-        opacity: 0;
-        transition: visibility 0s, opacity 0.3s ease;
-      }
-
-      .quick-move-panel.visible {
-        visibility: visible;
-        opacity: 1;
       }
 
       .quick-folder-item {
+        width: 150px;
+        box-sizing: border-box;
         display: flex;
         align-items: center;
-        gap: 10px;
-        padding: 8px;
-        margin-bottom: 8px;
+        gap: 3px;
+        padding: 4px 6px;
+        margin-bottom: 4px;
         background: var(--button-bg);
         border-radius: 4px;
         transition: all 0.2s ease;
+        font-size: 10px;
       }
 
-      .quick-folder-item .quick-folder-path {
+      .quick-folder-key {
+        flex: 0 0 auto;
+        min-width: 10px;
+        font-size: 9px;
+        opacity: 0.8;
+      }
+
+      .quick-folder-path {
         flex: 1;
         overflow: hidden;
         text-overflow: ellipsis;
         white-space: nowrap;
+        max-width: 120px;
+        font-size: 10px;
         cursor: pointer;
-      }
-
-      .quick-folder-item .quick-folder-path:hover {
-        opacity: 0.8;
       }
 
       .quick-folder-remove {
+        flex: 0 0 6px;
         opacity: 0.6;
         cursor: pointer;
-        padding: 4px 8px;
-        border-radius: 4px;
-      }
-
-      .quick-folder-remove:hover {
-        opacity: 1;
-        background: rgba(255, 0, 0, 0.2);
+        text-align: center;
+        font-size: 12px;
+        padding: 0 1px;
       }
 
       .quick-folder-item.empty {
         opacity: 0.5;
-        border: 1px dashed var(--border-color);
-        background: transparent;
-      }
-
-      .quick-folder-item.empty:hover {
-        opacity: 0.8;
-        background: var(--button-bg);
-      }
-
-      .quick-folder-item.empty .quick-folder-path {
-        font-style: italic;
-        color: var(--text-color);
+        font-size: 9px;
       }
 
       .file-info {
@@ -825,11 +751,32 @@
         border-radius: 8px;
         padding: 15px;
         display: none;
-        max-width: 300px;
+        min-width: 150px;
+        max-width: 80vw;
         border: 1px solid var(--border-color);
         z-index: 1000;
         max-height: 80vh;
         overflow-y: auto;
+        resize: none;
+        overflow: auto;
+      }
+
+      .quick-sort-tabs::before {
+        content: '';
+        position: absolute;
+        bottom: 0;
+        left: 0;
+        width: 15px;
+        height: 15px;
+        cursor: sw-resize;
+        background: linear-gradient(
+            45deg,
+            var(--border-color) 0%,
+            var(--border-color) 50%,
+            transparent 50%,
+            transparent 100%
+        );
+        z-index: 1001;
       }
 
       .tab-buttons {
@@ -952,6 +899,32 @@
 
       .quick-folder-column {
         flex: 1;
+      }
+
+      .quick-folder-path {
+        max-width: 200px;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+        display: inline-block;
+      }
+
+      .quick-folder-path:hover {
+        position: relative;
+      }
+
+      .quick-folder-path:hover::after {
+        content: attr(title);
+        position: absolute;
+        left: 0;
+        top: 100%;
+        background: var(--background-color);
+        border: 1px solid var(--border-color);
+        padding: 4px 8px;
+        border-radius: 4px;
+        z-index: 1000;
+        white-space: nowrap;
+        max-width: none;
       }
     </style>
   </head>
