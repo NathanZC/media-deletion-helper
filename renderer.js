@@ -8,8 +8,14 @@ let videoStartSettings = {
     playbackSpeed: 1,
     skim: {
         enabled: false,
-        playDuration: 2,
-        skipDuration: 10,
+        playDuration: {
+            value: 2,
+            mode: 'seconds'
+        },
+        skipDuration: {
+            value: 10,
+            mode: 'seconds'
+        },
         active: false
     }
 };
@@ -26,6 +32,10 @@ let undoStack = [];
 let quickSortGroups = {};
 let currentQuickSortGroup = 'group1';
 let tabNames = {};
+let autoAdvanceTimer = null;
+let autoAdvanceEnabled = false;
+let autoAdvanceDelay = parseInt(localStorage.getItem('autoAdvanceDelay')) || 3000;
+document.getElementById('auto-advance-delay').value = autoAdvanceDelay / 1000;
 
 const mediaElement = document.getElementById('current-media');
 const videoElement = document.getElementById('current-video');
@@ -97,12 +107,14 @@ function filterFiles() {
 
 function stopCurrentMedia() {
     if (videoElement) {
+        // Remove event listeners first
+        videoElement.removeEventListener('ended', handleMediaEnd);
         videoElement.pause();
         videoElement.src = '';  // Clear the source
         videoStartSettings.skim.active = false;  // Stop skimming if active
+        clearAutoAdvanceTimer();
     }
 }
-
 async function scanDirectory(dirPath, includeSubfolders, depth = 0) {
     let files = await window.electronAPI.getDirectoryContents(dirPath, includeSubfolders, depth);
     return files;
@@ -170,7 +182,7 @@ async function updateMedia() {
                     await new Promise(resolve => setTimeout(resolve, 100)); // Wait before retry
                 }
             }
-            
+            // Format resolution
             // Format file size
             const fileSize = formatFileSize(metadata.size);
             
@@ -211,9 +223,12 @@ async function updateMedia() {
             }
         }
     } finally {
+        // Setup auto-advance after media is loaded
+        setupAutoAdvance();
         isMediaUpdateInProgress = false;
     }
 }
+
 
 function formatFileSize(bytes) {
     const units = ['B', 'KB', 'MB', 'GB'];
@@ -396,26 +411,28 @@ imageFormats.addEventListener('change', filterFiles);
 videoFormats.addEventListener('change', filterFiles);
 
 function initializeVideoSettings() {
-    const radioButtons = document.querySelectorAll('input[name="video-start"]');
-    const fixedTimeInput = document.getElementById('fixed-start-time');
-    const percentageInput = document.getElementById('percentage-start');
-    const skimCheckbox = document.getElementById('enable-skim');
     const playDurationInput = document.getElementById('skim-play-duration');
     const skipDurationInput = document.getElementById('skim-skip-duration');
+    const skimCheckbox = document.getElementById('enable-skim');
     const playbackSpeedSelect = document.getElementById('playback-speed');
+    
+    const playDurationMode = document.querySelector('select[name="play-duration-mode"]');
+    const skipDurationMode = document.querySelector('select[name="skip-duration-mode"]');
 
-    radioButtons.forEach(radio => {
-        radio.addEventListener('change', (e) => {
-            videoStartSettings.mode = e.target.value;
-        });
+    playDurationInput.addEventListener('change', (e) => {
+        videoStartSettings.skim.playDuration.value = Math.max(0.1, parseFloat(e.target.value) || 2);
     });
 
-    fixedTimeInput.addEventListener('change', (e) => {
-        videoStartSettings.fixedTime = Math.max(0, parseInt(e.target.value) || 0);
+    skipDurationInput.addEventListener('change', (e) => {
+        videoStartSettings.skim.skipDuration.value = Math.max(0.1, parseFloat(e.target.value) || 10);
     });
 
-    percentageInput.addEventListener('change', (e) => {
-        videoStartSettings.percentage = Math.min(100, Math.max(0, parseInt(e.target.value) || 0));
+    playDurationMode.addEventListener('change', (e) => {
+        videoStartSettings.skim.playDuration.mode = e.target.value;
+    });
+
+    skipDurationMode.addEventListener('change', (e) => {
+        videoStartSettings.skim.skipDuration.mode = e.target.value;
     });
 
     skimCheckbox.addEventListener('change', (e) => {
@@ -423,14 +440,6 @@ function initializeVideoSettings() {
         if (e.target.checked && videoElement.duration) {
             startSkimming();
         }
-    });
-
-    playDurationInput.addEventListener('change', (e) => {
-        videoStartSettings.skim.playDuration = Math.max(1, parseInt(e.target.value) || 3);
-    });
-
-    skipDurationInput.addEventListener('change', (e) => {
-        videoStartSettings.skim.skipDuration = Math.max(1, parseInt(e.target.value) || 10);
     });
 
     playbackSpeedSelect.addEventListener('change', (e) => {
@@ -500,12 +509,33 @@ function handleSkimming() {
     const currentTime = videoElement.currentTime;
     const duration = videoElement.duration;
     
-    if (currentTime >= videoStartSettings.skim.lastSkipTime + videoStartSettings.skim.playDuration) {
-        const nextTime = currentTime + videoStartSettings.skim.skipDuration;
+    let playDuration, skipDuration;
+    
+    // Calculate play duration based on mode
+    if (videoStartSettings.skim.playDuration.mode === 'percentage') {
+        playDuration = (duration * videoStartSettings.skim.playDuration.value) / 100;
+    } else {
+        playDuration = videoStartSettings.skim.playDuration.value;
+    }
+    
+    // Calculate skip duration based on mode
+    if (videoStartSettings.skim.skipDuration.mode === 'percentage') {
+        skipDuration = (duration * videoStartSettings.skim.skipDuration.value) / 100;
+    } else {
+        skipDuration = videoStartSettings.skim.skipDuration.value;
+    }
+    
+    if (currentTime >= videoStartSettings.skim.lastSkipTime + playDuration) {
+        const nextTime = currentTime + skipDuration;
         
         if (nextTime >= duration) {
             videoStartSettings.skim.active = false;
             videoElement.pause();
+            
+            if (autoAdvanceEnabled && currentIndex < images.length - 1) {
+                currentIndex++;
+                updateMedia();
+            }
         } else {
             videoElement.currentTime = nextTime;
             videoStartSettings.skim.lastSkipTime = nextTime;
@@ -1460,4 +1490,70 @@ function initializeCustomResize() {
 // Call this function when the quick sort panel is initialized
 document.addEventListener('DOMContentLoaded', () => {
     initializeCustomResize();
+});
+
+function clearAutoAdvanceTimer() {
+    if (autoAdvanceTimer) {
+        clearTimeout(autoAdvanceTimer);
+        autoAdvanceTimer = null;
+    }
+}
+
+function setupAutoAdvance() {
+    clearAutoAdvanceTimer();
+    videoElement.removeEventListener('ended', handleMediaEnd);
+    
+    if (!autoAdvanceEnabled) return;
+    
+    const currentFile = images[currentIndex];
+    if (!currentFile) return;
+    
+    if (isVideo(currentFile)) {
+        // For videos, add the ended event listener
+        videoElement.addEventListener('ended', handleMediaEnd, { once: true });
+    } else {
+        // For images, use a timer
+        autoAdvanceTimer = setTimeout(handleMediaEnd, autoAdvanceDelay);
+    }
+}
+
+
+function handleMediaEnd() {
+    if (!autoAdvanceEnabled) return;
+    
+    // Clear any existing timers and listeners
+    clearAutoAdvanceTimer();
+    videoElement.removeEventListener('ended', handleMediaEnd);
+    
+    // Prevent multiple triggers
+    if (isMediaUpdateInProgress) return;
+    
+    if (currentIndex < images.length - 1) {
+        currentIndex++;
+        updateMedia();
+    }
+}
+document.getElementById('enable-autoplay').addEventListener('change', (e) => {
+    autoAdvanceEnabled = e.target.checked;
+    
+    // Clear any existing auto-advance setup
+    clearAutoAdvanceTimer();
+    videoElement.removeEventListener('ended', handleMediaEnd);
+    
+    // Setup new auto-advance if enabled
+    if (autoAdvanceEnabled) {
+        setupAutoAdvance();
+    }
+});
+
+document.getElementById('auto-advance-delay').addEventListener('change', (e) => {
+    const newDelay = Math.max(0.1, Math.min(60, parseFloat(e.target.value) || 3));
+    e.target.value = newDelay.toFixed(1); // Format to 1 decimal place
+    autoAdvanceDelay = newDelay * 1000; // Convert to milliseconds
+    localStorage.setItem('autoAdvanceDelay', autoAdvanceDelay);
+    
+    // Restart auto-advance with new delay if enabled
+    if (autoAdvanceEnabled && !isVideo(images[currentIndex])) {
+        setupAutoAdvance();
+    }
 });

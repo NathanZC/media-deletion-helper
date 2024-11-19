@@ -926,6 +926,72 @@
         white-space: nowrap;
         max-width: none;
       }
+
+      .auto-advance-timer {
+        margin-top: 8px;
+        margin-left: 20px;
+      }
+
+      .auto-advance-timer input {
+        width: 60px;
+        padding: 4px;
+        margin-left: 8px;
+      }
+
+      .radio-group {
+        display: flex;
+        gap: 5px;
+      }
+
+      .radio-group label {
+        display: flex;
+        align-items: center;
+        gap: 5px;
+      }
+
+      .radio-group input[type="radio"] {
+        cursor: pointer;
+      }
+
+      .radio-group input[type="radio"]:disabled + span {
+        opacity: 0.5;
+        cursor: not-allowed;
+      }
+
+      .radio-group input[type="radio"]:disabled {
+        cursor: not-allowed;
+      }
+
+      .radio-group.compact {
+        display: inline-flex;
+        align-items: center;
+        margin-left: 8px;
+      }
+
+      .small-radio {
+        display: inline-flex;
+        align-items: center;
+        font-size: 0.8em;
+        margin-right: 8px;
+        cursor: pointer;
+      }
+
+      .small-radio input[type="radio"] {
+        margin: 0 4px 0 0;
+        transform: scale(0.8);
+      }
+
+      .duration-mode {
+        margin-left: 8px;
+        padding: 2px 4px;
+        font-size: 0.9em;
+      }
+
+      .setting-row {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+      }
     </style>
   </head>
   <body>
@@ -1020,24 +1086,20 @@
           </div>
           <div class="skim-settings" id="skim-settings">
             <div class="setting-row">
-              <label>Play duration (seconds):</label>
-              <input
-                type="number"
-                id="skim-play-duration"
-                min="1"
-                value="3"
-                step="1"
-              />
+              <label>Play Duration:</label>
+              <input type="number" id="skim-play-duration" min="0.1" step="0.1" value="2" />
+              <select class="duration-mode" name="play-duration-mode">
+                  <option value="seconds">seconds</option>
+                  <option value="percentage">percent</option>
+              </select>
             </div>
             <div class="setting-row">
-              <label>Skip duration (seconds):</label>
-              <input
-                type="number"
-                id="skim-skip-duration"
-                min="1"
-                value="10"
-                step="1"
-              />
+              <label>Skip Duration:</label>
+              <input type="number" id="skim-skip-duration" min="0.1" step="0.1" value="10" />
+              <select class="duration-mode" name="skip-duration-mode">
+                  <option value="seconds">seconds</option>
+                  <option value="percentage">percent</option>
+              </select>
             </div>
           </div>
           <div class="setting-row">
@@ -1083,6 +1145,27 @@
               <input type="checkbox" id="enable-quick-move" />
               Show Quick Move Panel
             </label>
+          </div>
+          <div class="setting-row">
+            <label>
+              <input type="checkbox" id="enable-autoplay" />
+              Auto-advance when media ends
+            </label>
+          </div>
+          <div class="format-filters">
+            <div class="setting-row">
+              <label>Image display duration (seconds):
+                <input 
+                  type="number" 
+                  id="auto-advance-delay" 
+                  min="0.1" 
+                  max="60" 
+                  value="3" 
+                  step="0.1"
+                  style="width: 60px; margin-left: 10px;"
+                />
+              </label>
+            </div>
           </div>
         </div>
         <div class="filter-group theme-settings">
