@@ -960,3 +960,6 @@ openFileBtn.addEventListener('click', async () => {
         await window.electronAPI.openFileLocation(images[currentIndex]);
     }
 });
+
+// Initialize media display
+updateMedia();
